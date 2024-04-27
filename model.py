@@ -1,9 +1,7 @@
-from metaformer_baselines import MetaFormer, SepConv, Attention
+from metaformer_baselines import MetaFormer, SepConv, Attention, MetaFormerBlock
 from modules import CBAM
 from torch import nn
 import torch
-from reverse_metaformer import MetaFormerBlock
-
 
 class SkipCBAMConnection(nn.Module):
     def __init__(self, f1_dim, f2_dim) -> None:
