@@ -225,7 +225,7 @@ if __name__ == "__main__":
                     loss.backward()
 
                     # ---- metrics ----
-                    dice_score = SCD(img_1, img_2, logits)
+                    # dice_score = SCD(img_1, img_2, logits)
                     # ---- backward ----
                     # clip_gradient(optimizer, args.clip)
                     optimizer.step()
