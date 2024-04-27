@@ -177,7 +177,7 @@ if __name__ == "__main__":
         print(len(train_loader))
         _total_step = len(train_loader)
 
-        model = FusionModel()
+        model = FusionModel().cuda()
 
         # ---- flops and params ----
         params = model.parameters()
