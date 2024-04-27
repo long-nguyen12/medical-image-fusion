@@ -219,9 +219,11 @@ if __name__ == "__main__":
                     # ---- forward ----
                     logits = model(img_1, img_2)
 
-                    # _l1_loss = l1_loss(logits, img_2)
-                    _ssim_loss = ssim_loss(logits, img_1, img_2)
-                    loss = _ssim_loss
+                    _l1_loss_1 = l1_loss(logits, img_1)
+                    _l1_loss_2 = l1_loss(logits, img_2)
+                    _ssim_loss_1 = ssim_loss(logits, img_1)
+                    _ssim_loss_2 = ssim_loss(logits, img_2)
+                    loss = _ssim_loss_1 + _ssim_loss_2 + _l1_loss_1 + _l1_loss_2
                     loss.backward()
 
                     # ---- metrics ----
