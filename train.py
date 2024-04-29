@@ -37,14 +37,13 @@ class Dataset(torch.utils.data.Dataset):
         source_2_path = self.source_2_paths[idx]
 
         if self.type == "CT":
-            # source_1 = cv2.imread(source_1_path, cv2.IMREAD_GRAYSCALE)
-            # source_2 = cv2.imread(source_2_path, cv2.IMREAD_GRAYSCALE)
             source_1 = Image.open(source_1_path).convert("L")
             source_2 = Image.open(source_2_path).convert("L")
 
             if self.transform is not None:
                 source_1 = self.transform(source_1)
                 source_2 = self.transform(source_2)
+
             return np.asarray(source_1), np.asarray(source_2), np.asarray(source_2)
         else:
             img1 = Image.open(source_1_path).convert("RGB")
@@ -60,38 +59,6 @@ class Dataset(torch.utils.data.Dataset):
                 img2 = self.transform(img2)
 
             return np.asarray(img1_Y), np.asarray(img2), np.asarray(img1_CrCb)
-
-
-def get_scores(src_1, src_2, src_3, preds):
-    for i1, i2, i3, pr in zip(src_1, src_2, src_3, preds):
-        pass
-
-
-@torch.no_grad()
-def inference(model, dataloader, args=None):
-    print("#" * 20)
-    torch.cuda.empty_cache()
-    model.eval()
-    device = torch.device("cuda")
-
-    src_1 = []
-    src_2 = []
-    src_3 = []
-    prs = []
-    for i, pack in enumerate(test_loader, start=1):
-        img_1, img_2, img_3 = pack
-
-        img_1 = img_1.to(device)
-        img_2 = img_2.to(device)
-        if img_3 != None:
-            img_3 = img_3.to(device)
-
-        res = model(img_1, img_2)
-        src_1.append(img_1)
-        src_2.append(img_2)
-        src_3.append(img_3)
-        prs.append(res)
-    pass
 
 
 if __name__ == "__main__":
@@ -138,12 +105,6 @@ if __name__ == "__main__":
         train_img_paths.sort()
         train_mask_paths.sort()
 
-        # transform = A.Compose(
-        #     [
-        #         A.Resize(height=256, width=256),
-        #     ]
-        # )
-
         transform = transforms.Compose(
             [
                 transforms.Resize(256),
@@ -174,16 +135,14 @@ if __name__ == "__main__":
             pin_memory=True,
             drop_last=True,
         )
-        print(len(train_loader))
+
         _total_step = len(train_loader)
 
         model = FusionModel().cuda()
 
         # ---- flops and params ----
         params = model.parameters()
-        optimizer = torch.optim.AdamW(
-            params, args.init_lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.01
-        )
+        optimizer = torch.optim.Adam(params, args.init_lr)
         lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer,
             T_max=len(train_loader) * args.num_epochs,
@@ -215,7 +174,7 @@ if __name__ == "__main__":
                     img_1, img_2, img_Y = pack
                     img_1 = img_1.to(device)
                     img_2 = img_2.to(device)
-                    
+
                     # ---- forward ----
                     logits = model(img_1, img_2)
 
@@ -226,14 +185,10 @@ if __name__ == "__main__":
                     loss = _ssim_loss_1 + _ssim_loss_2 + _l1_loss_1 + _l1_loss_2
                     loss.backward()
 
-                    # ---- metrics ----
-                    # dice_score = SCD(img_1, img_2, logits)
-                    # ---- backward ----
-                    # clip_gradient(optimizer, args.clip)
+                    clip_gradient(optimizer, args.clip)
                     optimizer.step()
                     # ---- recording loss ----
                     loss_record.update(loss.data, args.batchsize)
-                    # iou.update(iou_score.data, args.batchsize)
 
                 # ---- train visualization ----
                 print(
@@ -245,7 +200,7 @@ if __name__ == "__main__":
                         loss_record.show(),
                     )
                 )
-                
+
         ckpt_path = save_path + "last.pth"
         print("[Saving Checkpoint:]", ckpt_path)
         torch.save(model.state_dict(), ckpt_path)

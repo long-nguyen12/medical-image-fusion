@@ -1,7 +1,14 @@
-from metaformer_baselines import MetaFormer, SepConv, Attention, MetaFormerBlock
+from metaformer_baselines import (
+    MetaFormer,
+    SepConv,
+    Attention,
+    MetaFormerBlock,
+    Pooling,
+)
 from modules import CBAM
 from torch import nn
 import torch
+
 
 class SkipCBAMConnection(nn.Module):
     def __init__(self, f1_dim, f2_dim) -> None:
@@ -11,23 +18,26 @@ class SkipCBAMConnection(nn.Module):
         self.cbam_2 = CBAM(f2_dim)
 
     def forward(self, f1, f2):
-        x_f = torch.fft.fft2(f1)
-        x_f = torch.fft.fftshift(x_f)
-        x_f = torch.log(1 + torch.abs(x_f))
+        # _f1 = f1.clone()
+        # _f2 = f1.clone()
 
-        y_f = torch.fft.fft2(f2)
-        y_f = torch.fft.fftshift(y_f)
-        y_f = torch.log(1 + torch.abs(y_f))
+        # x_f = torch.fft.fft2(f1)
+        # x_f = torch.fft.fftshift(x_f)
+        # x_f = torch.log(1 + torch.abs(x_f))
 
-        x1 = self.cbam_1(x_f.permute(0, 3, 1, 2))
-        x2 = self.cbam_2(y_f.permute(0, 3, 1, 2))
+        # y_f = torch.fft.fft2(f2)
+        # y_f = torch.fft.fftshift(y_f)
+        # y_f = torch.log(1 + torch.abs(y_f))
+
+        x1 = self.cbam_1(f1.permute(0, 3, 1, 2))
+        x2 = self.cbam_2(f2.permute(0, 3, 1, 2))
 
         x = x1 + x2
-        out = torch.fft.ifftshift(x)
-        out = torch.fft.ifft2(out)
-        out = torch.abs(out)
+        # out = torch.fft.ifftshift(x)
+        # out = torch.fft.ifft2(out)
+        # out = torch.abs(out)
 
-        return out
+        return x
 
 
 class Encoder(nn.Module):
@@ -35,12 +45,12 @@ class Encoder(nn.Module):
         super().__init__()
 
         self.encoder = MetaFormer(
-            depths=[3, 12, 18, 3],
+            depths=[2, 2, 6, 2],
             dims=[64, 128, 320, 512],
-            token_mixers=[SepConv, SepConv, Attention, Attention],
+            token_mixers=[Pooling, Pooling, Pooling, Pooling],
             head_fn=None,
         )
-        state_dict = torch.load("pretrained/caformer_s36.pth")
+        state_dict = torch.load("pretrained/poolformerv2_s12.pth")
         self.encoder.load_state_dict(state_dict, strict=False)
 
         self.skip_1 = SkipCBAMConnection(64, 64)
@@ -66,10 +76,10 @@ class Decoder(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-        self.decoder_1 = MetaFormerBlock(64, SepConv)
-        self.decoder_2 = MetaFormerBlock(128, SepConv)
-        self.decoder_3 = MetaFormerBlock(320, SepConv)
-        self.decoder_4 = MetaFormerBlock(512, SepConv)
+        self.decoder_1 = MetaFormerBlock(64, Pooling)
+        self.decoder_2 = MetaFormerBlock(128, Pooling)
+        self.decoder_3 = MetaFormerBlock(320, Pooling)
+        self.decoder_4 = MetaFormerBlock(512, Pooling)
         self.up = nn.Upsample(scale_factor=2, mode="bicubic", align_corners=True)
         self.output = nn.Upsample(scale_factor=4, mode="bicubic", align_corners=True)
 
