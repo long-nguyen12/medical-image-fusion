@@ -45,7 +45,8 @@ class Encoder(nn.Module):
         super().__init__()
 
         self.encoder = MetaFormer(
-            depths=[2, 2, 6, 2],
+            # depths=[2, 2, 6, 2],
+            depths=[1, 1, 1, 1],
             dims=[64, 128, 320, 512],
             token_mixers=[Pooling, Pooling, Pooling, Pooling],
             head_fn=None,
