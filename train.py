@@ -153,6 +153,10 @@ if __name__ == "__main__":
 
         best_result = 0
         loss_record = AvgMeter()
+        loss_1_record = AvgMeter()
+        loss_2_record = AvgMeter()
+        loss_3_record = AvgMeter()
+        loss_4_record = AvgMeter()
 
         l1_loss = torch.nn.L1Loss()
         ssim_loss = pytorch_msssim.ssim
@@ -189,15 +193,23 @@ if __name__ == "__main__":
                     optimizer.step()
                     # ---- recording loss ----
                     loss_record.update(loss.data, args.batchsize)
+                    loss_1_record.update(_l1_loss_1.data, args.batchsize)
+                    loss_2_record.update(_l1_loss_2.data, args.batchsize)
+                    loss_3_record.update(_ssim_loss_1.data, args.batchsize)
+                    loss_4_record.update(_ssim_loss_2.data, args.batchsize)
 
                 # ---- train visualization ----
                 print(
                     "{} Training Epoch [{:03d}/{:03d}], "
-                    "[loss: {:0.4f}]".format(
+                    "[loss: {:0.4f}, loss_1 L1: {:0.4f}, loss_2 L2: {:0.4f}, loss_1 SSIM: {:0.4f}, loss_2 SSIM: {:0.4f}]".format(
                         datetime.now(),
                         epoch,
                         args.num_epochs,
                         loss_record.show(),
+                        loss_1_record.show(),
+                        loss_2_record.show(),
+                        loss_3_record.show(),
+                        loss_4_record.show(),
                     )
                 )
 

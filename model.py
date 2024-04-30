@@ -19,25 +19,26 @@ class SkipCBAMConnection(nn.Module):
         self.cbam_2 = CBAM(f2_dim)
 
     def forward(self, f1, f2):
-        # _f1 = f1.clone()
-        # _f2 = f1.clone()
+        _f1 = f1.clone()
+        _f2 = f1.clone()
+        _x1 = self.cbam_1(_f1)
+        _x2 = self.cbam_2(_f2)
+        x_f = torch.fft.fft2(f1)
+        x_f = torch.fft.fftshift(x_f)
+        x_f = torch.log(1 + torch.abs(x_f))
 
-        # x_f = torch.fft.fft2(f1)
-        # x_f = torch.fft.fftshift(x_f)
-        # x_f = torch.log(1 + torch.abs(x_f))
-
-        # y_f = torch.fft.fft2(f2)
-        # y_f = torch.fft.fftshift(y_f)
-        # y_f = torch.log(1 + torch.abs(y_f))
+        y_f = torch.fft.fft2(f2)
+        y_f = torch.fft.fftshift(y_f)
+        y_f = torch.log(1 + torch.abs(y_f))
 
         x1 = self.cbam_1(f1)
         x2 = self.cbam_2(f2)
 
         x = x1 + x2
-        # out = torch.fft.ifftshift(x)
-        # out = torch.fft.ifft2(out)
-        # out = torch.abs(out)
-
+        out = torch.fft.ifftshift(x)
+        out = torch.fft.ifft2(out)
+        out = torch.abs(out)
+        x = x + _x1 + _x2
         return x
 
 
@@ -66,7 +67,7 @@ class Encoder(nn.Module):
 
         x1, x2, x3, x4 = features_1
         y1, y2, y3, y4 = features_2
-        
+
         con_1 = self.skip_1(x1, y1)
         con_2 = self.skip_2(x2, y2)
         con_3 = self.skip_3(x3, y3)
@@ -100,7 +101,7 @@ class Decoder(nn.Module):
         y4 = self.decoder_4(x4)
         # y4 = self.dec_4(y4)
         y4 = self.up(y4)
-        
+
         y3 = x3 + y4
         y3 = self.decoder_3(x3)
         # y3 = self.dec_3(y3)
