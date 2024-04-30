@@ -1,14 +1,8 @@
-from metaformer_baselines import (
-    MetaFormer,
-    SepConv,
-    Attention,
-    MetaFormerBlock,
-    Pooling,
-)
 from modules import CBAM
 from torch import nn
 import torch
 from backbone.resnet import CustomResNet, BasicBlock
+from backbone.res2net import custom_res2net50_v1b, Bottle2neck
 
 
 class SkipCBAMConnection(nn.Module):
@@ -23,23 +17,23 @@ class SkipCBAMConnection(nn.Module):
         # _f2 = f1.clone()
         # _x1 = self.cbam_1(_f1)
         # _x2 = self.cbam_2(_f2)
-        x_f = torch.fft.fft2(f1)
-        x_f = torch.fft.fftshift(x_f)
-        x_f = torch.log(1 + torch.abs(x_f))
+        # x_f = torch.fft.fft2(f1)
+        # x_f = torch.fft.fftshift(x_f)
+        # x_f = torch.log(1 + torch.abs(x_f))
 
-        y_f = torch.fft.fft2(f2)
-        y_f = torch.fft.fftshift(y_f)
-        y_f = torch.log(1 + torch.abs(y_f))
+        # y_f = torch.fft.fft2(f2)
+        # y_f = torch.fft.fftshift(y_f)
+        # y_f = torch.log(1 + torch.abs(y_f))
 
         x1 = self.cbam_1(f1)
         x2 = self.cbam_2(f2)
 
         x = x1 + x2
-        out = torch.fft.ifftshift(x)
-        out = torch.fft.ifft2(out)
-        out = torch.abs(out)
+        # out = torch.fft.ifftshift(x)
+        # out = torch.fft.ifft2(out)
+        # out = torch.abs(out)
         # x = x + _x1 + _x2
-        return out
+        return x
 
 
 class Encoder(nn.Module):
@@ -55,7 +49,7 @@ class Encoder(nn.Module):
         # )
         # state_dict = torch.load("pretrained/poolformerv2_s12.pth")
         # self.encoder.load_state_dict(state_dict, strict=False)
-        self.encoder = CustomResNet()
+        self.encoder = custom_res2net50_v1b(pretrained=True)
         self.skip_1 = SkipCBAMConnection(64, 64)
         self.skip_2 = SkipCBAMConnection(128, 128)
         self.skip_3 = SkipCBAMConnection(256, 256)
@@ -115,8 +109,8 @@ class Decoder(nn.Module):
         y1 = x1 + y2
         y1 = self.decoder_1(x1)
         # out = self.dec_1(y1)
-        # out = self.output(y1)
-        out = y1
+        out = self.output(y1)
+        # out = y1
 
         return out
 
