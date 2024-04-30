@@ -8,6 +8,7 @@ from metaformer_baselines import (
 from modules import CBAM
 from torch import nn
 import torch
+from backbone.resnet import CustomResNet, BasicBlock
 
 
 class SkipCBAMConnection(nn.Module):
@@ -29,8 +30,8 @@ class SkipCBAMConnection(nn.Module):
         # y_f = torch.fft.fftshift(y_f)
         # y_f = torch.log(1 + torch.abs(y_f))
 
-        x1 = self.cbam_1(f1.permute(0, 3, 1, 2))
-        x2 = self.cbam_2(f2.permute(0, 3, 1, 2))
+        x1 = self.cbam_1(f1)
+        x2 = self.cbam_2(f2)
 
         x = x1 + x2
         # out = torch.fft.ifftshift(x)
@@ -44,19 +45,19 @@ class Encoder(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-        self.encoder = MetaFormer(
-            # depths=[2, 2, 6, 2],
-            depths=[1, 1, 1, 1],
-            dims=[64, 128, 320, 512],
-            token_mixers=[Pooling, Pooling, Pooling, Pooling],
-            head_fn=None,
-        )
-        state_dict = torch.load("pretrained/poolformerv2_s12.pth")
-        self.encoder.load_state_dict(state_dict, strict=False)
-
+        # self.encoder = MetaFormer(
+        #     depths=[2, 2, 6, 2],
+        #     # depths=[1, 1, 1, 1],
+        #     dims=[64, 128, 320, 512],
+        #     token_mixers=[Pooling, Pooling, Pooling, Pooling],
+        #     head_fn=None,
+        # )
+        # state_dict = torch.load("pretrained/poolformerv2_s12.pth")
+        # self.encoder.load_state_dict(state_dict, strict=False)
+        self.encoder = CustomResNet()
         self.skip_1 = SkipCBAMConnection(64, 64)
         self.skip_2 = SkipCBAMConnection(128, 128)
-        self.skip_3 = SkipCBAMConnection(320, 320)
+        self.skip_3 = SkipCBAMConnection(256, 256)
         self.skip_4 = SkipCBAMConnection(512, 512)
 
     def forward(self, img_1, img_2):
@@ -65,7 +66,7 @@ class Encoder(nn.Module):
 
         x1, x2, x3, x4 = features_1
         y1, y2, y3, y4 = features_2
-
+        
         con_1 = self.skip_1(x1, y1)
         con_2 = self.skip_2(x2, y2)
         con_3 = self.skip_3(x3, y3)
@@ -77,43 +78,44 @@ class Decoder(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-        self.decoder_1 = MetaFormerBlock(64, Pooling)
-        self.decoder_2 = MetaFormerBlock(128, Pooling)
-        self.decoder_3 = MetaFormerBlock(320, Pooling)
-        self.decoder_4 = MetaFormerBlock(512, Pooling)
+        self.decoder_1 = BasicBlock(64, 1, 1)
+        self.decoder_2 = BasicBlock(128, 64, 1)
+        self.decoder_3 = BasicBlock(256, 128, 1)
+        self.decoder_4 = BasicBlock(512, 256, 1)
         self.up = nn.Upsample(scale_factor=2, mode="bicubic", align_corners=True)
         self.output = nn.Upsample(scale_factor=4, mode="bicubic", align_corners=True)
 
-        self.dec_4 = nn.Conv2d(in_channels=512, out_channels=320, kernel_size=1)
-        self.dec_3 = nn.Conv2d(in_channels=320, out_channels=128, kernel_size=1)
-        self.dec_2 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=1)
-        self.dec_1 = nn.Conv2d(in_channels=64, out_channels=1, kernel_size=1)
+        # self.dec_4 = nn.Conv2d(in_channels=512, out_channels=256, kernel_size=1)
+        # self.dec_3 = nn.Conv2d(in_channels=256, out_channels=128, kernel_size=1)
+        # self.dec_2 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=1)
+        # self.dec_1 = nn.Conv2d(in_channels=64, out_channels=1, kernel_size=1)
 
     def forward(self, x):
         x1, x2, x3, x4 = x
-        x1 = x1.permute(0, 2, 3, 1)
-        x2 = x2.permute(0, 2, 3, 1)
-        x3 = x3.permute(0, 2, 3, 1)
-        x4 = x4.permute(0, 2, 3, 1)
+        # x1 = x1.permute(0, 2, 3, 1)
+        # x2 = x2.permute(0, 2, 3, 1)
+        # x3 = x3.permute(0, 2, 3, 1)
+        # x4 = x4.permute(0, 2, 3, 1)
 
-        y4 = self.decoder_4(x4).permute(0, 3, 1, 2)
-        y4 = self.dec_4(y4)
+        y4 = self.decoder_4(x4)
+        # y4 = self.dec_4(y4)
         y4 = self.up(y4)
-
-        y3 = x3.permute(0, 3, 1, 2) + y4
-        y3 = self.decoder_3(x3).permute(0, 3, 1, 2)
-        y3 = self.dec_3(y3)
+        
+        y3 = x3 + y4
+        y3 = self.decoder_3(x3)
+        # y3 = self.dec_3(y3)
         y3 = self.up(y3)
 
-        y2 = x2.permute(0, 3, 1, 2) + y3
-        y2 = self.decoder_2(x2).permute(0, 3, 1, 2)
-        y2 = self.dec_2(y2)
+        y2 = x2 + y3
+        y2 = self.decoder_2(x2)
+        # y2 = self.dec_2(y2)
         y2 = self.up(y2)
 
-        y1 = x1.permute(0, 3, 1, 2) + y2
-        y1 = self.decoder_1(x1).permute(0, 3, 1, 2)
-        y1 = self.dec_1(y1)
-        out = self.output(y1)
+        y1 = x1 + y2
+        y1 = self.decoder_1(x1)
+        # out = self.dec_1(y1)
+        # out = self.output(y1)
+        out = y1
 
         return out
 
@@ -124,11 +126,12 @@ class FusionModel(nn.Module):
         self.encoder = Encoder()
         self.decoder = Decoder()
 
-        self.conv = nn.Conv2d(1, 3, 1)
+        # self.conv = nn.Conv2d(1, 3, 1)
+        # self.bn1 = nn.BatchNorm2d(3)
 
     def forward(self, x, y):
-        x = self.conv(x)
-        y = self.conv(y)
+        # x = self.conv(x)
+        # y = self.conv(y)
         enc_out = self.encoder(x, y)
         dec_out = self.decoder(enc_out)
 
