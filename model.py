@@ -2,15 +2,16 @@ from modules import CBAM
 from torch import nn
 import torch
 from backbone.resnet import CustomResNet, BasicBlock
-from backbone.res2net import custom_res2net50_v1b, Bottle2neck
-
+from attention.triplet_attention import TripletAttention
 
 class SkipCBAMConnection(nn.Module):
     def __init__(self, f1_dim, f2_dim) -> None:
         super().__init__()
 
-        self.cbam_1 = CBAM(f1_dim)
-        self.cbam_2 = CBAM(f2_dim)
+        # self.cbam_1 = CBAM(f1_dim)
+        # self.cbam_2 = CBAM(f2_dim)
+        self.cbam_1 = TripletAttention()
+        self.cbam_2 = TripletAttention()
 
     def forward(self, f1, f2):
         # _f1 = f1.clone()
@@ -49,7 +50,7 @@ class Encoder(nn.Module):
         # )
         # state_dict = torch.load("pretrained/poolformerv2_s12.pth")
         # self.encoder.load_state_dict(state_dict, strict=False)
-        self.encoder = custom_res2net50_v1b(pretrained=True)
+        self.encoder = CustomResNet()
         self.skip_1 = SkipCBAMConnection(64, 64)
         self.skip_2 = SkipCBAMConnection(128, 128)
         self.skip_3 = SkipCBAMConnection(256, 256)
@@ -77,8 +78,8 @@ class Decoder(nn.Module):
         self.decoder_2 = BasicBlock(128, 64, 1)
         self.decoder_3 = BasicBlock(256, 128, 1)
         self.decoder_4 = BasicBlock(512, 256, 1)
-        self.up = nn.Upsample(scale_factor=2, mode="bicubic", align_corners=True)
-        self.output = nn.Upsample(scale_factor=4, mode="bicubic", align_corners=True)
+        self.up = nn.Upsample(scale_factor=2, mode="bilinear")
+        self.output = nn.Upsample(scale_factor=4, mode="bilinear")
 
         # self.dec_4 = nn.Conv2d(in_channels=512, out_channels=256, kernel_size=1)
         # self.dec_3 = nn.Conv2d(in_channels=256, out_channels=128, kernel_size=1)
@@ -109,8 +110,8 @@ class Decoder(nn.Module):
         y1 = x1 + y2
         y1 = self.decoder_1(x1)
         # out = self.dec_1(y1)
-        out = self.output(y1)
-        # out = y1
+        # out = self.output(y1)
+        out = y1
 
         return out
 

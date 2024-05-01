@@ -158,7 +158,7 @@ if __name__ == "__main__":
         loss_3_record = AvgMeter()
         loss_4_record = AvgMeter()
 
-        l1_loss = torch.nn.L1Loss()
+        l1_loss = torch.nn.MSELoss()
         ssim_loss = pytorch_msssim.ssim
 
         print("#" * 20, "Start Training", "#" * 20)
