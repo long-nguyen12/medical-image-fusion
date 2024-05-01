@@ -26,8 +26,8 @@ class SkipCBAMConnection(nn.Module):
         # y_f = torch.fft.fftshift(y_f)
         # y_f = torch.log(1 + torch.abs(y_f))
 
-        x1 = self.cbam_1(f1)
-        x2 = self.cbam_2(f2)
+        x1 = self.cbam_1(f1) + f1
+        x2 = self.cbam_2(f2) + f2
 
         x = x1 + x2
         # out = torch.fft.ifftshift(x)
