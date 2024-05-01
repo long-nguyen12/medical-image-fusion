@@ -11,8 +11,6 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 from utils import AvgMeter, clip_gradient
-from loss import loss_total
-from metrics import ssim_f, SCD
 from PIL import Image
 from torchvision import transforms
 
