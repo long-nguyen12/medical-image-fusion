@@ -1,4 +1,4 @@
-from modules import CBAM
+from attention.modules import CBAM
 from torch import nn
 import torch
 from backbone.resnet import CustomResNet, BasicBlock
