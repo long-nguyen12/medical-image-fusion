@@ -18,6 +18,7 @@ from torchvision import transforms
 # from val import inference
 from model import FusionModel
 import pytorch_msssim
+from losses import CharbonnierLoss_IR, CharbonnierLoss_VI, tv_vi, tv_ir
 
 
 class Dataset(torch.utils.data.Dataset):
@@ -78,6 +79,8 @@ if __name__ == "__main__":
         help="path to train dataset",
     )
     parser.add_argument("--train_save", type=str, default="ours")
+    parser.add_argument("--weight", default=[0.03, 1000, 10, 100], type=float)
+
     args = parser.parse_args()
 
     device = torch.device("cuda")
@@ -168,6 +171,7 @@ if __name__ == "__main__":
 
         l1_loss = torch.nn.MSELoss()
         ssim_loss = pytorch_msssim.ssim
+        weight = args.weight
 
         print("#" * 20, "Start Training", "#" * 20)
         for epoch in range(start_epoch, epochs + 1):
@@ -188,23 +192,34 @@ if __name__ == "__main__":
                     img_2 = img_2.to(device)
 
                     # ---- forward ----
-                    logits = model(img_1, img_2)
+                    out = model(img_1, img_2)
 
-                    _l1_loss_1 = l1_loss(logits, img_1)
-                    _l1_loss_2 = l1_loss(logits, img_2)
-                    _ssim_loss_1 = ssim_loss(logits, img_1)
-                    _ssim_loss_2 = ssim_loss(logits, img_2)
-                    loss = _ssim_loss_1 + _ssim_loss_2 + _l1_loss_1 + _l1_loss_2
+                    # _l1_loss_1 = l1_loss(logits, img_1)
+                    # _l1_loss_2 = l1_loss(logits, img_2)
+                    # _ssim_loss_1 = ssim_loss(logits, img_1)
+                    # _ssim_loss_2 = ssim_loss(logits, img_2)
+                    # loss = _ssim_loss_1 + _ssim_loss_2 + _l1_loss_1 + _l1_loss_2
+                    CharbonnierLoss_IR = weight[0] * CharbonnierLoss_IR(out, img_1)
+                    CharbonnierLoss_VI = weight[1] * CharbonnierLoss_VI(out, img_2)
+                    loss_tv_ir = weight[2] * tv_ir(out, img_1)
+                    loss_tv_vi = weight[3] * tv_vi(out, img_2)
+                    loss = (
+                        CharbonnierLoss_IR
+                        + CharbonnierLoss_VI
+                        + loss_tv_ir
+                        + loss_tv_vi
+                    )
+
                     loss.backward()
 
                     clip_gradient(optimizer, args.clip)
                     optimizer.step()
                     # ---- recording loss ----
                     loss_record.update(loss.data, args.batchsize)
-                    loss_1_record.update(_l1_loss_1.data, args.batchsize)
-                    loss_2_record.update(_l1_loss_2.data, args.batchsize)
-                    loss_3_record.update(_ssim_loss_1.data, args.batchsize)
-                    loss_4_record.update(_ssim_loss_2.data, args.batchsize)
+                    loss_1_record.update(CharbonnierLoss_IR.data, args.batchsize)
+                    loss_2_record.update(CharbonnierLoss_VI.data, args.batchsize)
+                    loss_3_record.update(loss_tv_ir.data, args.batchsize)
+                    loss_4_record.update(loss_tv_vi.data, args.batchsize)
 
                 # ---- train visualization ----
                 print(
