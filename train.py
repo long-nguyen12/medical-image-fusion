@@ -63,8 +63,8 @@ class Dataset(torch.utils.data.Dataset):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--num_epochs", type=int, default=100, help="epoch number")
-    parser.add_argument("--init_lr", type=float, default=1e-4, help="learning rate")
+    parser.add_argument("--num_epochs", type=int, default=50, help="epoch number")
+    parser.add_argument("--init_lr", type=float, default=1e-3, help="learning rate")
     parser.add_argument("--batchsize", type=int, default=16, help="training batch size")
     parser.add_argument(
         "--init_trainsize", type=int, default=256, help="training dataset size"
@@ -125,40 +125,40 @@ if __name__ == "__main__":
             drop_last=True,
         )
 
-        test_img_paths = []
-        test_mask_paths = []
-        test_img_paths = glob(
-            "{}/{}/test/{}/*".format(args.train_path, _ds, dataset_path[0])
-        )
-        test_mask_paths = glob(
-            "{}/{}/test/{}/*".format(args.train_path, _ds, dataset_path[1])
-        )
-        test_img_paths.sort()
-        test_mask_paths.sort()
+        # test_img_paths = []
+        # test_mask_paths = []
+        # test_img_paths = glob(
+        #     "{}/{}/test/{}/*".format(args.train_path, _ds, dataset_path[0])
+        # )
+        # test_mask_paths = glob(
+        #     "{}/{}/test/{}/*".format(args.train_path, _ds, dataset_path[1])
+        # )
+        # test_img_paths.sort()
+        # test_mask_paths.sort()
 
-        test_dataset = Dataset(
-            test_img_paths, test_mask_paths, transform=transform, type=dataset_path[0]
-        )
-        test_loader = torch.utils.data.DataLoader(
-            test_dataset,
-            batch_size=1,
-            shuffle=False,
-            pin_memory=True,
-            drop_last=True,
-        )
+        # test_dataset = Dataset(
+        #     test_img_paths, test_mask_paths, transform=transform, type=dataset_path[0]
+        # )
+        # test_loader = torch.utils.data.DataLoader(
+        #     test_dataset,
+        #     batch_size=1,
+        #     shuffle=False,
+        #     pin_memory=True,
+        #     drop_last=True,
+        # )
 
-        _total_step = len(train_loader)
+        # _total_step = len(train_loader)
 
         model = FusionModel().cuda()
 
         # ---- flops and params ----
         params = model.parameters()
         optimizer = torch.optim.Adam(params, args.init_lr)
-        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=len(train_loader) * args.num_epochs,
-            eta_min=args.init_lr / 1000,
-        )
+        # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        #     optimizer,
+        #     T_max=len(train_loader) * args.num_epochs,
+        #     eta_min=args.init_lr / 1000,
+        # )
 
         start_epoch = 1
 
@@ -172,18 +172,22 @@ if __name__ == "__main__":
         l1_loss = torch.nn.MSELoss()
         ssim_loss = pytorch_msssim.ssim
         weight = args.weight
+        criterion_CharbonnierLoss_IR = CharbonnierLoss_IR
+        criterion_CharbonnierLoss_VI = CharbonnierLoss_VI
+        criterion_tv_ir = tv_ir
+        criterion_tv_vi = tv_vi
 
         print("#" * 20, "Start Training", "#" * 20)
         for epoch in range(start_epoch, epochs + 1):
             model.train()
             with torch.autograd.set_detect_anomaly(True):
                 for i, pack in enumerate(train_loader, start=1):
-                    if epoch <= 1:
-                        optimizer.param_groups[0]["lr"] = (
-                            (epoch * i) / (1.0 * _total_step) * args.init_lr
-                        )
-                    else:
-                        lr_scheduler.step()
+                    # if epoch <= 1:
+                    #     optimizer.param_groups[0]["lr"] = (
+                    #         (epoch * i) / (1.0 * _total_step) * args.init_lr
+                    #     )
+                    # else:
+                    #     lr_scheduler.step()
 
                     optimizer.zero_grad()
                     # ---- data prepare ----
@@ -199,10 +203,14 @@ if __name__ == "__main__":
                     # _ssim_loss_1 = ssim_loss(logits, img_1)
                     # _ssim_loss_2 = ssim_loss(logits, img_2)
                     # loss = _ssim_loss_1 + _ssim_loss_2 + _l1_loss_1 + _l1_loss_2
-                    CharbonnierLoss_IR = weight[0] * CharbonnierLoss_IR(out, img_1)
-                    CharbonnierLoss_VI = weight[1] * CharbonnierLoss_VI(out, img_2)
-                    loss_tv_ir = weight[2] * tv_ir(out, img_1)
-                    loss_tv_vi = weight[3] * tv_vi(out, img_2)
+                    CharbonnierLoss_IR = weight[0] * criterion_CharbonnierLoss_IR(
+                        out, img_1
+                    )
+                    CharbonnierLoss_VI = weight[1] * criterion_CharbonnierLoss_VI(
+                        out, img_2
+                    )
+                    loss_tv_ir = weight[2] * criterion_tv_ir(out, img_1)
+                    loss_tv_vi = weight[3] * criterion_tv_vi(out, img_2)
                     loss = (
                         CharbonnierLoss_IR
                         + CharbonnierLoss_VI
