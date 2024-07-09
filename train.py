@@ -46,8 +46,10 @@ class Dataset(torch.utils.data.Dataset):
 
             return np.asarray(source_1), np.asarray(source_2), np.asarray(source_2)
         else:
-            img1 = Image.open(source_1_path).convert("RGB")
-            img2 = Image.open(source_2_path).convert("L")
+            # img1 = Image.open(source_1_path).convert("RGB")
+            # img2 = Image.open(source_2_path).convert("L")
+            img1 = cv2.imread(source_1_path)
+            img2 = cv2.imread(source_2_path, cv2.IMREAD_GRAYSCALE)
 
             img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2YCrCb)  # CT/PET/SPECT 256,256,3
 
@@ -86,7 +88,8 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     epochs = args.num_epochs
-    ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
+    # ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
+    ds = ["PET-MRI", "SPECT-MRI"]
     for _ds in ds:
         save_path = "snapshots/{}/{}/".format(args.train_save, _ds)
         if not os.path.exists(save_path):
@@ -109,6 +112,7 @@ if __name__ == "__main__":
 
         transform = transforms.Compose(
             [
+                transforms.ToPILImage(),
                 transforms.Resize(256),
                 transforms.ToTensor(),
             ]
