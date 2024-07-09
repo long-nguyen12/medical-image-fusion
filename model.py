@@ -128,6 +128,7 @@ class FusionModel(nn.Module):
         self.linear_fuse = ConvModule(self.embed_dim * 4, self.embed_dim)
         self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
         self.dropout = nn.Dropout2d(0.1)
+        self.sigmoid = nn.Sigmoid()
         # self.decoder = Decoder()
 
         # self.conv = nn.Conv2d(1, 3, 1)
@@ -154,6 +155,7 @@ class FusionModel(nn.Module):
 
         out = self.linear_fuse(torch.cat(outs[::-1], dim=1))
         out = self.linear_pred(self.dropout(out))
+        out = self.sigmoid(out)
 
         return out
 
