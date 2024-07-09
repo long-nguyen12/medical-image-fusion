@@ -90,7 +90,7 @@ class Decoder(nn.Module):
         # out = self.dec_1(y1)
         out = y1
         out = self.sigmoid(out)
-        out = self.output(out)
+        # out = self.output(out)
 
         return out
 
