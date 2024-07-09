@@ -57,7 +57,7 @@ class Decoder(nn.Module):
         self.decoder_4 = BasicBlock(512, 256, 1)
         self.sigmoid = nn.Sigmoid()
         self.up = nn.Upsample(scale_factor=2, mode="bilinear")
-        # self.output = nn.Upsample(scale_factor=4, mode="bilinear")
+        self.output = nn.Upsample(scale_factor=4, mode="bilinear")
 
         # self.dec_4 = nn.Conv2d(in_channels=512, out_channels=256, kernel_size=1)
         # self.dec_3 = nn.Conv2d(in_channels=256, out_channels=128, kernel_size=1)
@@ -88,9 +88,9 @@ class Decoder(nn.Module):
         y1 = x1 + y2
         y1 = self.decoder_1(x1)
         # out = self.dec_1(y1)
-        # out = self.output(y1)
         out = y1
         out = self.sigmoid(out)
+        out = self.output(out)
 
         return out
 
