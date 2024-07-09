@@ -4,6 +4,7 @@ from datetime import datetime
 from glob import glob
 
 import albumentations as A
+from albumentations.pytorch import ToTensorV2
 import cv2
 import numpy as np
 import torch
@@ -37,7 +38,7 @@ class Dataset(torch.utils.data.Dataset):
         if self.type == "CT":
             source_1 = Image.open(source_1_path).convert("L")
             source_2 = Image.open(source_2_path).convert("L")
-            
+
             if self.transform is not None:
                 source_1 = self.transform(source_1)
                 source_2 = self.transform(source_2)
@@ -73,7 +74,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--train_path",
         type=str,
-        default="./data/Havard-Medical-Image-Fusion-Datasets",
+        default="./data/Havard-Medical-Image-Fusion-Datasets/MyDatasets",
         help="path to train dataset",
     )
     parser.add_argument("--train_save", type=str, default="ours")
@@ -95,28 +96,22 @@ if __name__ == "__main__":
         train_img_paths = []
         train_mask_paths = []
         train_img_paths = glob(
-            "{}/{}/{}/*".format(args.train_path, _ds, dataset_path[0])
+            "{}/{}/train/{}/*".format(args.train_path, _ds, dataset_path[0])
         )
         train_mask_paths = glob(
-            "{}/{}/{}/*".format(args.train_path, _ds, dataset_path[1])
+            "{}/{}/train/{}/*".format(args.train_path, _ds, dataset_path[1])
         )
         train_img_paths.sort()
         train_mask_paths.sort()
 
-        transform = transforms.Compose(
+        transform = A.Compose(
             [
-                transforms.Resize(256),
-                transforms.ToTensor(),
+                A.Resize(height=256, width=256),
+                ToTensorV2(),
             ]
         )
-        dataset = Dataset(
+        train_dataset = Dataset(
             train_img_paths, train_mask_paths, transform=transform, type=dataset_path[0]
-        )
-        total_dataset = len(dataset)
-        training_ratio = int(total_dataset * 0.9)
-        test_ratio = total_dataset - training_ratio
-        train_dataset, test_dataset = torch.utils.data.random_split(
-            dataset, [training_ratio, test_ratio]
         )
 
         train_loader = torch.utils.data.DataLoader(
@@ -126,10 +121,25 @@ if __name__ == "__main__":
             pin_memory=True,
             drop_last=True,
         )
+
+        test_img_paths = []
+        test_mask_paths = []
+        test_img_paths = glob(
+            "{}/{}/test/{}/*".format(args.train_path, _ds, dataset_path[0])
+        )
+        test_mask_paths = glob(
+            "{}/{}/test/{}/*".format(args.train_path, _ds, dataset_path[1])
+        )
+        test_img_paths.sort()
+        test_mask_paths.sort()
+
+        test_dataset = Dataset(
+            test_img_paths, test_mask_paths, transform=transform, type=dataset_path[0]
+        )
         test_loader = torch.utils.data.DataLoader(
             test_dataset,
-            batch_size=args.batchsize,
-            shuffle=True,
+            batch_size=1,
+            shuffle=False,
             pin_memory=True,
             drop_last=True,
         )
