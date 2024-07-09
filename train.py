@@ -40,8 +40,9 @@ class Dataset(torch.utils.data.Dataset):
             source_2 = Image.open(source_2_path).convert("L")
 
             if self.transform is not None:
-                source_1 = self.transform(source_1)
-                source_2 = self.transform(source_2)
+                aug = self.transform(image=source_1, mask=source_2)
+                source_1 = aug["source_1"]
+                source_2 = aug["source_2"]
 
             return np.asarray(source_1), np.asarray(source_2), np.asarray(source_2)
         else:
@@ -54,8 +55,9 @@ class Dataset(torch.utils.data.Dataset):
             img1_CrCb = img1[:, :, 1:3].transpose(2, 0, 1)
 
             if self.transform:
-                img1_Y = self.transform(img1_Y)
-                img2 = self.transform(img2)
+                aug = self.transform(image=source_1, mask=source_2)
+                source_1 = aug["source_1"]
+                source_2 = aug["source_2"]
 
             return np.asarray(img1_Y), np.asarray(img2), np.asarray(img1_CrCb)
 
@@ -64,7 +66,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--num_epochs", type=int, default=100, help="epoch number")
     parser.add_argument("--init_lr", type=float, default=1e-4, help="learning rate")
-    parser.add_argument("--batchsize", type=int, default=4, help="training batch size")
+    parser.add_argument("--batchsize", type=int, default=16, help="training batch size")
     parser.add_argument(
         "--init_trainsize", type=int, default=256, help="training dataset size"
     )
