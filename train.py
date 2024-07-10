@@ -88,8 +88,8 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     epochs = args.num_epochs
-    # ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
-    ds = ["PET-MRI", "SPECT-MRI"]
+    ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
+    # ds = ["PET-MRI", "SPECT-MRI"]
     for _ds in ds:
         save_path = "snapshots/{}/{}/".format(args.train_save, _ds)
         if not os.path.exists(save_path):
@@ -173,8 +173,6 @@ if __name__ == "__main__":
         loss_3_record = AvgMeter()
         loss_4_record = AvgMeter()
 
-        l1_loss = torch.nn.MSELoss()
-        ssim_loss = pytorch_msssim.ssim
         weight = args.weight
         criterion_CharbonnierLoss_IR = CharbonnierLoss_IR
         criterion_CharbonnierLoss_VI = CharbonnierLoss_VI
@@ -202,11 +200,6 @@ if __name__ == "__main__":
                     # ---- forward ----
                     out = model(img_1, img_2)
 
-                    # _l1_loss_1 = l1_loss(logits, img_1)
-                    # _l1_loss_2 = l1_loss(logits, img_2)
-                    # _ssim_loss_1 = ssim_loss(logits, img_1)
-                    # _ssim_loss_2 = ssim_loss(logits, img_2)
-                    # loss = _ssim_loss_1 + _ssim_loss_2 + _l1_loss_1 + _l1_loss_2
                     CharbonnierLoss_IR = weight[0] * criterion_CharbonnierLoss_IR(
                         out, img_1
                     )

@@ -3,6 +3,7 @@ from torch import nn
 import torch
 from backbone.resnet import CustomResNet, BasicBlock
 from torch.nn import functional as F
+from backbone.res2net import custom_res2net50_v1b
 
 
 class SkipCBAMConnection(nn.Module):
@@ -27,7 +28,7 @@ class Encoder(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-        self.encoder = CustomResNet()
+        self.encoder = custom_res2net50_v1b()
         self.skip_1 = SkipCBAMConnection(64, 64)
         self.skip_2 = SkipCBAMConnection(128, 128)
         self.skip_3 = SkipCBAMConnection(256, 256)
@@ -39,7 +40,7 @@ class Encoder(nn.Module):
 
         x1, x2, x3, x4 = features_1
         y1, y2, y3, y4 = features_2
-
+        
         con_1 = self.skip_1(x1, y1)
         con_2 = self.skip_2(x2, y2)
         con_3 = self.skip_3(x3, y3)
@@ -55,7 +56,6 @@ class Decoder(nn.Module):
         self.decoder_2 = BasicBlock(128, 64, 1)
         self.decoder_3 = BasicBlock(256, 128, 1)
         self.decoder_4 = BasicBlock(512, 256, 1)
-        self.sigmoid = nn.Sigmoid()
         self.up = nn.Upsample(scale_factor=2, mode="bilinear")
         self.output = nn.Upsample(scale_factor=4, mode="bilinear")
 
@@ -89,7 +89,6 @@ class Decoder(nn.Module):
         y1 = self.decoder_1(x1)
         # out = self.dec_1(y1)
         out = y1
-        out = self.sigmoid(out)
         # out = self.output(out)
 
         return out
