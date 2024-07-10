@@ -223,8 +223,8 @@ if __name__ == "__main__":
                     optimizer.step()
                     # ---- recording loss ----
                     loss_record.update(loss.data, args.batchsize)
-                    loss_1_record.update(CharbonnierLoss_IR.data, args.batchsize)
-                    loss_2_record.update(CharbonnierLoss_VI.data, args.batchsize)
+                    loss_1_record.update(_CharbonnierLoss_IR.data, args.batchsize)
+                    loss_2_record.update(_CharbonnierLoss_VI.data, args.batchsize)
                     loss_3_record.update(loss_tv_ir.data, args.batchsize)
                     loss_4_record.update(loss_tv_vi.data, args.batchsize)
 
