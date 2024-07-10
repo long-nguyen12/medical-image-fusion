@@ -37,8 +37,10 @@ class Dataset(torch.utils.data.Dataset):
         source_2_path = self.source_2_paths[idx]
 
         if self.type == "CT":
-            source_1 = Image.open(source_1_path).convert("L")
-            source_2 = Image.open(source_2_path).convert("L")
+            source_1 = cv2.imread(source_1_path, cv2.IMREAD_GRAYSCALE)
+            source_2 = cv2.imread(source_2_path, cv2.IMREAD_GRAYSCALE)
+            # source_1 = Image.open(source_1_path).convert("L")
+            # source_2 = Image.open(source_2_path).convert("L")
 
             if self.transform is not None:
                 source_1 = self.transform(source_1)
