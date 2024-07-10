@@ -202,17 +202,17 @@ if __name__ == "__main__":
                     # ---- forward ----
                     out = model(img_1, img_2)
 
-                    CharbonnierLoss_IR = weight[0] * criterion_CharbonnierLoss_IR(
+                    _CharbonnierLoss_IR = weight[0] * criterion_CharbonnierLoss_IR(
                         out, img_1
                     )
-                    CharbonnierLoss_VI = weight[1] * criterion_CharbonnierLoss_VI(
+                    _CharbonnierLoss_VI = weight[1] * criterion_CharbonnierLoss_VI(
                         out, img_2
                     )
                     loss_tv_ir = weight[2] * criterion_tv_ir(out, img_1)
                     loss_tv_vi = weight[3] * criterion_tv_vi(out, img_2)
                     loss = (
-                        CharbonnierLoss_IR
-                        + CharbonnierLoss_VI
+                        _CharbonnierLoss_IR
+                        + _CharbonnierLoss_VI
                         + loss_tv_ir
                         + loss_tv_vi
                     )
