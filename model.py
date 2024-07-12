@@ -40,7 +40,7 @@ class Encoder(nn.Module):
 
         x1, x2, x3, x4 = features_1
         y1, y2, y3, y4 = features_2
-        
+
         con_1 = self.skip_1(x1, y1)
         con_2 = self.skip_2(x2, y2)
         con_3 = self.skip_3(x3, y3)
@@ -122,7 +122,7 @@ class FusionModel(nn.Module):
         self.encoder = Encoder()
         self.embed_dim = 256
         for i, dim in enumerate([64, 128, 256, 512]):
-            self.add_module(f"linear_c{i+1}", MLP(dim, self.embed_dim))
+            self.add_module(f"linear_c{i+1}", ConvModule(dim, self.embed_dim))
 
         self.linear_fuse = ConvModule(self.embed_dim * 4, self.embed_dim)
         self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
@@ -136,17 +136,18 @@ class FusionModel(nn.Module):
     def forward(self, x, y):
         features = self.encoder(x, y)
         B, _, H, W = features[0].shape
+
         outs = [
             self.linear_c1(features[0])
-            .permute(0, 2, 1)
-            .reshape(B, -1, *features[0].shape[-2:])
+            # .permute(0, 2, 1)
+            # .reshape(B, -1, *features[0].shape[-2:])
         ]
 
         for i, feature in enumerate(features[1:]):
             cf = (
                 eval(f"self.linear_c{i+2}")(feature)
-                .permute(0, 2, 1)
-                .reshape(B, -1, *feature.shape[-2:])
+                # .permute(0, 2, 1)
+                # .reshape(B, -1, *feature.shape[-2:])
             )
             outs.append(
                 F.interpolate(cf, size=(H, W), mode="bilinear", align_corners=False)
