@@ -69,7 +69,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--num_epochs", type=int, default=50, help="epoch number")
     parser.add_argument("--init_lr", type=float, default=1e-3, help="learning rate")
-    parser.add_argument("--batchsize", type=int, default=16, help="training batch size")
+    parser.add_argument("--batchsize", type=int, default=8, help="training batch size")
     parser.add_argument(
         "--init_trainsize", type=int, default=256, help="training dataset size"
     )
@@ -87,7 +87,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    device = torch.device("cuda")
+    device = torch.device("cuda:1")
 
     epochs = args.num_epochs
     ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
@@ -155,7 +155,7 @@ if __name__ == "__main__":
 
         # _total_step = len(train_loader)
 
-        model = FusionModel().cuda()
+        model = FusionModel().to(device)
 
         # ---- flops and params ----
         params = model.parameters()

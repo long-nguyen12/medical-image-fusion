@@ -12,9 +12,9 @@ from PIL import Image
 from torch.autograd import Variable
 from torchvision import transforms
 
-# from val import inference
 from model import FusionModel
 from torchvision.utils import save_image
+from metrics import Qmi
 
 
 class Dataset(torch.utils.data.Dataset):
@@ -34,8 +34,8 @@ class Dataset(torch.utils.data.Dataset):
         source_1_name = source_1_path.split("\\")[-1]
 
         if self.type == "CT":
-            source_1 = Image.open(source_1_path).convert("L")
-            source_2 = Image.open(source_2_path).convert("L")
+            source_1 = cv2.imread(source_1_path, cv2.IMREAD_GRAYSCALE)
+            source_2 = cv2.imread(source_2_path, cv2.IMREAD_GRAYSCALE)
 
             if self.transform is not None:
                 source_1 = self.transform(source_1)
@@ -68,6 +68,16 @@ class Dataset(torch.utils.data.Dataset):
             )
 
 
+def get_scores(src_1, src_2, prs):
+    mean_qmi = 0
+    for gt_1, gt_2, pr in zip(src_1, src_2, prs):
+        mean_qmi += Qmi(gt_1, gt_2, pr)
+
+    mean_qmi /= len(src_1)
+
+    print("scores: Qmi={}".format(mean_qmi))
+
+
 @torch.no_grad()
 def inference(model, dataloader, args=None):
     print("#" * 20)
@@ -93,6 +103,8 @@ def inference(model, dataloader, args=None):
         src_3.append(img_3)
         prs.append(res)
 
+    get_scores(src_1, src_2, prs)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -111,10 +123,10 @@ if __name__ == "__main__":
     parser.add_argument("--train_save", type=str, default="ours")
     args = parser.parse_args()
 
-    device = torch.device("cpu")
+    device = torch.device("cuda:1")
 
-    # ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
-    ds = ["PET-MRI", "SPECT-MRI"]
+    ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
+    # ds = ["PET-MRI", "SPECT-MRI"]
     for _ds in ds:
         save_path = "results/{}/".format(_ds)
         if not os.path.exists(save_path):
@@ -152,7 +164,7 @@ if __name__ == "__main__":
         )
 
         saved_model = f"snapshots/ours/{_ds}/last.pth"
-        model = FusionModel().cpu()
+        model = FusionModel().to(device)
         state_dict = torch.load(saved_model, map_location="cpu")
         model.load_state_dict(state_dict, strict=True)
 
@@ -167,14 +179,17 @@ if __name__ == "__main__":
             img_1, img_2, img_3, img_name = pack
             img_1 = img_1.to(device)
             img_2 = img_2.to(device)
-            # if img_3 != None:
-            #     img_3 = img_3.to(device)
 
             res = model(img_1, img_2)
 
             res = res.data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8) * 255
             fused_img = res
+
+            src_1.append(img_1.cpu().numpy())
+            src_2.append(img_2.cpu().numpy())
+            src_3.append(img_3)
+            prs.append((res * 255).astype(np.uint8))
 
             # res = res.data.cpu().numpy()
             # res = (res - res.min()) / (res.max() - res.min() + 1e-8) * 255
@@ -184,4 +199,6 @@ if __name__ == "__main__":
             # fused_img = fused_img.astype(np.uint8)
             # fused_img = cv2.cvtColor(fused_img, cv2.COLOR_YCrCb2BGR)
 
-            cv2.imwrite(f'{save_path}/{img_name[0]}', fused_img)
+            cv2.imwrite(f"{save_path}/{img_name[0]}", fused_img)
+
+        get_scores(src_1, src_2, prs)
