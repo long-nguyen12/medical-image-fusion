@@ -31,7 +31,7 @@ class Dataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         source_1_path = self.source_1_paths[idx]
         source_2_path = self.source_2_paths[idx]
-        source_1_name = source_1_path.split("\\")[-1]
+        source_1_name = source_1_path.split("/")[-1]
 
         if self.type == "CT":
             source_1 = cv2.imread(source_1_path, cv2.IMREAD_GRAYSCALE)
@@ -189,7 +189,7 @@ if __name__ == "__main__":
             src_1.append(img_1.cpu().numpy())
             src_2.append(img_2.cpu().numpy())
             src_3.append(img_3)
-            prs.append((res * 255).astype(np.uint8))
+            prs.append(res.astype(np.uint8))
 
             # res = res.data.cpu().numpy()
             # res = (res - res.min()) / (res.max() - res.min() + 1e-8) * 255
@@ -198,7 +198,7 @@ if __name__ == "__main__":
             # fused_img = np.transpose(fused_img, (1, 2, 0))
             # fused_img = fused_img.astype(np.uint8)
             # fused_img = cv2.cvtColor(fused_img, cv2.COLOR_YCrCb2BGR)
-
-            cv2.imwrite(f"{save_path}/{img_name[0]}", fused_img)
+            # print(f"{save_path}/{img_name[0]}")
+            # cv2.imwrite(f"{save_path}/{img_name[0]}", fused_img)
 
         get_scores(src_1, src_2, prs)

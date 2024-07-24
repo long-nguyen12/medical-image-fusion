@@ -12,16 +12,47 @@ class SkipCBAMConnection(nn.Module):
 
         self.cbam_1 = CBAM(f1_dim)
         self.cbam_2 = CBAM(f2_dim)
-        self.dim = f1_dim
+        dim = f1_dim
 
         self.conv = nn.Conv2d(f1_dim + f2_dim, f1_dim, 1)
+        self.attention = nn.Sequential(
+            nn.Conv2d(
+                in_channels=dim,
+                out_channels=dim,
+                kernel_size=1,
+                groups=dim,
+            ),
+            nn.BatchNorm2d(dim),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=dim,
+                out_channels=dim,
+                kernel_size=1,
+                groups=dim,
+            ),
+        )
 
     def forward(self, f1, f2):
-        x1 = self.cbam_1(f1)
-        x2 = self.cbam_2(f2)
+        # x1 = self.cbam_1(f1)
+        # x2 = self.cbam_2(f2)
+        
+        x = f1 + f1
+        avg_pool = F.avg_pool2d(
+            x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3))
+        )
 
-        x = self.conv(torch.cat((x1, x2), dim=1))
-        return x
+        max_pool = F.max_pool2d(
+            x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3))
+        )
+
+        out = avg_pool + max_pool
+        out = self.attention(out)
+        out = F.softmax(out, dim=1)
+        
+        out = f1 * out + f2 * out
+        
+        return out
+
 
 
 class Encoder(nn.Module):
@@ -59,28 +90,37 @@ class Decoder(nn.Module):
         self.up = nn.Upsample(scale_factor=2, mode="bilinear")
         self.output = nn.Upsample(scale_factor=4, mode="bilinear")
 
+        # self.dec_4 = nn.Conv2d(in_channels=512, out_channels=256, kernel_size=1)
+        # self.dec_3 = nn.Conv2d(in_channels=256, out_channels=128, kernel_size=1)
+        # self.dec_2 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=1)
+        # self.dec_1 = nn.Conv2d(in_channels=64, out_channels=1, kernel_size=1)
+
     def forward(self, x):
         x1, x2, x3, x4 = x
-        outs = []
+        # x1 = x1.permute(0, 2, 3, 1)
+        # x2 = x2.permute(0, 2, 3, 1)
+        # x3 = x3.permute(0, 2, 3, 1)
+        # x4 = x4.permute(0, 2, 3, 1)
 
         y4 = self.decoder_4(x4)
+        # y4 = self.dec_4(y4)
         y4 = self.up(y4)
-        outs.append(y4)
 
         y3 = x3 + y4
         y3 = self.decoder_3(x3)
+        # y3 = self.dec_3(y3)
         y3 = self.up(y3)
-        outs.append(y3)
 
         y2 = x2 + y3
         y2 = self.decoder_2(x2)
+        # y2 = self.dec_2(y2)
         y2 = self.up(y2)
-        outs.append(y2)
 
         y1 = x1 + y2
         y1 = self.decoder_1(x1)
+        # out = self.dec_1(y1)
         out = y1
-        outs.append(y1)
+        # out = self.output(out)
 
         return out
 
@@ -113,40 +153,39 @@ class FusionModel(nn.Module):
         self.encoder = Encoder()
         self.embed_dim = 256
         for i, dim in enumerate([64, 128, 256, 512]):
-            self.add_module(f"linear_c{i+1}", ConvModule(dim, self.embed_dim))
+            self.add_module(f"linear_c{i+1}", MLP(dim, self.embed_dim))
 
-        # self.linear_fuse = ConvModule(self.embed_dim * 4, self.embed_dim)
-        # self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
-        # self.dropout = nn.Dropout2d(0.1)
+        self.linear_fuse = ConvModule(self.embed_dim * 4, self.embed_dim)
+        self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
+        self.dropout = nn.Dropout2d(0.1)
         self.sigmoid = nn.Sigmoid()
-        self.decoder = Decoder()
+        # self.decoder = Decoder()
 
         # self.conv = nn.Conv2d(1, 3, 1)
         # self.bn1 = nn.BatchNorm2d(3)
 
     def forward(self, x, y):
         features = self.encoder(x, y)
-        # B, _, H, W = features[0].shape
+        B, _, H, W = features[0].shape
 
-        # outs = [
-        #     self.linear_c1(features[0])
-        #     # .permute(0, 2, 1)
-        #     # .reshape(B, -1, *features[0].shape[-2:])
-        # ]
+        outs = [
+            self.linear_c1(features[0])
+            .permute(0, 2, 1)
+            .reshape(B, -1, *features[0].shape[-2:])
+        ]
 
-        # for i, feature in enumerate(features[1:]):
-        #     cf = (
-        #         eval(f"self.linear_c{i+2}")(feature)
-        #         # .permute(0, 2, 1)
-        #         # .reshape(B, -1, *feature.shape[-2:])
-        #     )
-        #     outs.append(
-        #         F.interpolate(cf, size=(H, W), mode="bilinear", align_corners=False)
-        #     )
+        for i, feature in enumerate(features[1:]):
+            cf = (
+                eval(f"self.linear_c{i+2}")(feature)
+                .permute(0, 2, 1)
+                .reshape(B, -1, *feature.shape[-2:])
+            )
+            outs.append(
+                F.interpolate(cf, size=(H, W), mode="bilinear", align_corners=False)
+            )
 
-        # out = self.linear_fuse(torch.cat(outs[::-1], dim=1))
-        # out = self.linear_pred(self.dropout(out))
-        out = self.decoder(features)
+        out = self.linear_fuse(torch.cat(outs[::-1], dim=1))
+        out = self.linear_pred(self.dropout(out))
         out = self.sigmoid(out)
 
         return out
