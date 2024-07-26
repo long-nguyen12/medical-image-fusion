@@ -39,17 +39,13 @@ class Dataset(torch.utils.data.Dataset):
         if self.type == "CT":
             source_1 = cv2.imread(source_1_path, cv2.IMREAD_GRAYSCALE)
             source_2 = cv2.imread(source_2_path, cv2.IMREAD_GRAYSCALE)
-            # source_1 = Image.open(source_1_path).convert("L")
-            # source_2 = Image.open(source_2_path).convert("L")
-
+            
             if self.transform is not None:
                 source_1 = self.transform(source_1)
                 source_2 = self.transform(source_2)
 
             return np.asarray(source_1), np.asarray(source_2), np.asarray(source_2)
         else:
-            # img1 = Image.open(source_1_path).convert("RGB")
-            # img2 = Image.open(source_2_path).convert("L")
             img1 = cv2.imread(source_1_path)
             img2 = cv2.imread(source_2_path, cv2.IMREAD_GRAYSCALE)
 
@@ -91,7 +87,6 @@ if __name__ == "__main__":
 
     epochs = args.num_epochs
     ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
-    # ds = ["PET-MRI", "SPECT-MRI"]
     for _ds in ds:
         save_path = "snapshots/{}/{}/".format(args.train_save, _ds)
         if not os.path.exists(save_path):
@@ -131,40 +126,11 @@ if __name__ == "__main__":
             drop_last=True,
         )
 
-        # test_img_paths = []
-        # test_mask_paths = []
-        # test_img_paths = glob(
-        #     "{}/{}/test/{}/*".format(args.train_path, _ds, dataset_path[0])
-        # )
-        # test_mask_paths = glob(
-        #     "{}/{}/test/{}/*".format(args.train_path, _ds, dataset_path[1])
-        # )
-        # test_img_paths.sort()
-        # test_mask_paths.sort()
-
-        # test_dataset = Dataset(
-        #     test_img_paths, test_mask_paths, transform=transform, type=dataset_path[0]
-        # )
-        # test_loader = torch.utils.data.DataLoader(
-        #     test_dataset,
-        #     batch_size=1,
-        #     shuffle=False,
-        #     pin_memory=True,
-        #     drop_last=True,
-        # )
-
-        # _total_step = len(train_loader)
-
         model = FusionModel().to(device)
 
         # ---- flops and params ----
         params = model.parameters()
         optimizer = torch.optim.Adam(params, args.init_lr)
-        # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        #     optimizer,
-        #     T_max=len(train_loader) * args.num_epochs,
-        #     eta_min=args.init_lr / 1000,
-        # )
 
         start_epoch = 1
 
@@ -186,12 +152,6 @@ if __name__ == "__main__":
             model.train()
             with torch.autograd.set_detect_anomaly(True):
                 for i, pack in enumerate(train_loader, start=1):
-                    # if epoch <= 1:
-                    #     optimizer.param_groups[0]["lr"] = (
-                    #         (epoch * i) / (1.0 * _total_step) * args.init_lr
-                    #     )
-                    # else:
-                    #     lr_scheduler.step()
 
                     optimizer.zero_grad()
                     # ---- data prepare ----

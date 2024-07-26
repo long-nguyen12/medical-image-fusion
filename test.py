@@ -199,6 +199,6 @@ if __name__ == "__main__":
             # fused_img = fused_img.astype(np.uint8)
             # fused_img = cv2.cvtColor(fused_img, cv2.COLOR_YCrCb2BGR)
             # print(f"{save_path}/{img_name[0]}")
-            # cv2.imwrite(f"{save_path}/{img_name[0]}", fused_img)
+            cv2.imwrite(f"{save_path}/{img_name[0]}", fused_img)
 
         get_scores(src_1, src_2, prs)
