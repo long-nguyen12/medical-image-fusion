@@ -1,10 +1,8 @@
 from attention.modules import CBAM
 from torch import nn
 import torch
-from backbone.resnet import CustomResNet, BasicBlock
 from torch.nn import functional as F
 from backbone.res2net import custom_res2net50_v1b
-from backbone.van import van_b0
 
 
 class SkipCBAMConnection(nn.Module):
@@ -31,7 +29,7 @@ class Encoder(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-        self.encoder = van_b0()
+        self.encoder = custom_res2net50_v1b()
         self.skip_1 = SkipCBAMConnection(32, 32)
         self.skip_2 = SkipCBAMConnection(64, 64)
         self.skip_3 = SkipCBAMConnection(160, 160)
