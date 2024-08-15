@@ -5,21 +5,115 @@ from torch.nn import functional as F
 from backbone.res2net import custom_res2net50_v1b
 
 
-class SkipCBAMConnection(nn.Module):
-    def __init__(self, f1_dim, f2_dim) -> None:
+class DilationConvModule(nn.Module):
+    def __init__(self, c1, c2, k, s, p=0, d=1, g=1):
+        super().__init__()
+        self.conv = nn.Conv2d(c1, c2, k, s, p, d, g, bias=False)
+        self.bn = nn.BatchNorm2d(c2)
+        self.act = nn.ReLU(True)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.act(x)
+        return x
+
+
+class FusionConnection(nn.Module):
+    def __init__(self, dim) -> None:
         super().__init__()
 
-        self.cbam_1 = CBAM(f1_dim)
-        self.cbam_2 = CBAM(f2_dim)
-        dim = f1_dim
+        self.cbam_1 = CBAM(dim)
+        self.cbam_2 = CBAM(dim)
+        scales = [1, 3, 5]
 
-        self.conv = nn.Conv2d(2 * dim, dim, 1)
+        self.d_10 = DilationConvModule(
+            dim,
+            dim,
+            (3, 1),
+            1,
+            p=(1 * scales[0] + 1, 0),
+            d=(scales[0] + 1, 1),
+            g=dim,
+        )
+        self.d_11 = DilationConvModule(
+            dim,
+            dim,
+            (1, 3),
+            1,
+            p=(0, 1 * scales[0] + 1),
+            d=(1, scales[0] + 1),
+            g=dim,
+        )
+
+        self.d_30 = DilationConvModule(
+            dim,
+            dim,
+            (3, 1),
+            1,
+            p=(1 * scales[1] + 1, 0),
+            d=(scales[1] + 1, 1),
+            g=dim,
+        )
+        self.d_31 = DilationConvModule(
+            dim,
+            dim,
+            (1, 3),
+            1,
+            p=(0, 1 * scales[1] + 1),
+            d=(1, scales[1] + 1),
+            g=dim,
+        )
+
+        self.d_50 = DilationConvModule(
+            dim,
+            dim,
+            (3, 1),
+            1,
+            p=(1 * scales[2] + 1, 0),
+            d=(scales[2] + 1, 1),
+            g=dim,
+        )
+        self.d_51 = DilationConvModule(
+            dim,
+            dim,
+            (1, 3),
+            1,
+            p=(0, 1 * scales[2] + 1),
+            d=(1, scales[2] + 1),
+            g=dim,
+        )
+
+        self.conv = ConvModule(len(scales) * dim, dim)
 
     def forward(self, f1, f2):
         x1 = self.cbam_1(f1)
         x2 = self.cbam_2(f2)
 
-        out = torch.cat([x1, x2], dim=1)
+        x1_d_10 = self.d_10(x1)
+        x1_d_11 = self.d_11(x1_d_10)
+
+        x1_d_30 = self.d_30(x1)
+        x1_d_31 = self.d_31(x1_d_30)
+
+        x1_d_50 = self.d_50(x1)
+        x1_d_51 = self.d_51(x1_d_50)
+
+        x2_d_10 = self.d_10(x2)
+        x2_d_11 = self.d_11(x2_d_10)
+
+        x2_d_30 = self.d_30(x2)
+        x2_d_31 = self.d_31(x2_d_30)
+
+        x2_d_50 = self.d_50(x2)
+        x2_d_51 = self.d_51(x2_d_50)
+
+        xd_1 = x1_d_11 + x2_d_11
+        xd_3 = x1_d_31 + x2_d_31
+        xd_5 = x1_d_51 + x2_d_51
+
+        print(xd_1.shape, xd_3.shape, xd_5.shape)
+        out = torch.cat([xd_1, xd_3, xd_5], dim=1)
         out = self.conv(out)
 
         return out
@@ -30,10 +124,10 @@ class Encoder(nn.Module):
         super().__init__()
 
         self.encoder = custom_res2net50_v1b()
-        self.skip_1 = SkipCBAMConnection(64, 64)
-        self.skip_2 = SkipCBAMConnection(128, 128)
-        self.skip_3 = SkipCBAMConnection(256, 256)
-        self.skip_4 = SkipCBAMConnection(512, 512)
+        self.skip_1 = FusionConnection(64)
+        self.skip_2 = FusionConnection(128)
+        self.skip_3 = FusionConnection(256)
+        self.skip_4 = FusionConnection(512)
 
     def forward(self, img_1, img_2):
         features_1 = self.encoder(img_1)
