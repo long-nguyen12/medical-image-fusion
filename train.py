@@ -83,7 +83,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    device = torch.device("cuda:1")
+    device = torch.device("cuda")
 
     epochs = args.num_epochs
     ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
