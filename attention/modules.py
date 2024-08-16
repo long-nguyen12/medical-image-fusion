@@ -144,3 +144,19 @@ class CBAM(nn.Module):
         if not self.no_spatial:
             x_out = self.SpatialGate(x_out)
         return x_out
+
+
+class ECALayer(nn.Module):
+    def __init__(self, channels, gamma=2, b=1):
+        super().__init__()
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        t = int(abs((math.log(channels, 2) + b) / gamma))
+        k = t if t % 2 else t + 1
+        self.conv = nn.Conv1d(1, 1, kernel_size=k, padding=(k - 1) // 2, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        y = self.avgpool(x)
+        y = self.conv(y.squeeze(-1).transpose(-1, -2)).transpose(-1, -2).unsqueeze(-1)
+        y = self.sigmoid(y)
+        return x * y.expand_as(x)

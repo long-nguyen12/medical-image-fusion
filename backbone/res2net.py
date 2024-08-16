@@ -1,16 +1,7 @@
 import torch.nn as nn
 import math
-import torch.utils.model_zoo as model_zoo
 import torch
-import torch.nn.functional as F
-
-__all__ = ["Res2Net", "res2net50_v1b", "res2net101_v1b"]
-
-
-model_urls = {
-    "res2net50_v1b_26w_4s": "https://shanghuagao.oss-cn-beijing.aliyuncs.com/res2net/res2net50_v1b_26w_4s-3cf99910.pth",
-    "res2net101_v1b_26w_4s": "https://shanghuagao.oss-cn-beijing.aliyuncs.com/res2net/res2net101_v1b_26w_4s-0812c246.pth",
-}
+from attention.modules import ECALayer
 
 
 class Bottle2neck(nn.Module):
@@ -26,16 +17,6 @@ class Bottle2neck(nn.Module):
         scale=4,
         stype="normal",
     ):
-        """Constructor
-        Args:
-            inplanes: input channel dimensionality
-            planes: output channel dimensionality
-            stride: conv stride. Replaces pooling layer.
-            downsample: None when stride = 1
-            baseWidth: basic width of conv3x3
-            scale: number of scale.
-            type: 'normal': normal set. 'stage': first block of a new stage.
-        """
         super(Bottle2neck, self).__init__()
 
         width = int(math.floor(planes * (baseWidth / 64.0)))
@@ -64,6 +45,8 @@ class Bottle2neck(nn.Module):
             width * scale, planes * self.expansion, kernel_size=1, bias=False
         )
         self.bn3 = nn.BatchNorm2d(planes * self.expansion)
+
+        self.eca = ECALayer(planes * self.expansion)
 
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
@@ -97,7 +80,8 @@ class Bottle2neck(nn.Module):
 
         out = self.conv3(out)
         out = self.bn3(out)
-
+        out = self.eca(out)
+        
         if self.downsample is not None:
             residual = self.downsample(x)
 
@@ -109,19 +93,19 @@ class Bottle2neck(nn.Module):
 
 class Res2Net(nn.Module):
 
-    def __init__(self, block, layers, baseWidth=26, scale=4, num_classes=1000):
-        self.inplanes = 64
+    def __init__(self, block, layers, baseWidth=26, scale=4):
+        self.inplanes = 32
         super(Res2Net, self).__init__()
         self.baseWidth = baseWidth
         self.scale = scale
-        self.conv1 = nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(64)
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(32)
         self.relu = nn.ReLU()
-        # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.layer1 = self._make_layer(block, 32, layers[0])
+        self.layer2 = self._make_layer(block, 64, layers[1], stride=2)
+        self.layer3 = self._make_layer(block, 128, layers[2], stride=2)
+        self.layer4 = self._make_layer(block, 256, layers[3], stride=2)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -175,7 +159,7 @@ class Res2Net(nn.Module):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        # x = self.maxpool(x)
+        x = self.maxpool(x)
 
         x = self.layer1(x)
         outs.append(x)
@@ -189,62 +173,6 @@ class Res2Net(nn.Module):
         return outs
 
 
-def custom_res2net50_v1b(pretrained=False, **kwargs):
-    model = Res2Net(Bottle2neck, [1, 1, 1, 1], baseWidth=26, scale=4, **kwargs)
-    return model
-
-
-def res2net50_v1b(pretrained=False, **kwargs):
-    """Constructs a Res2Net-50_v1b model.
-    Res2Net-50 refers to the Res2Net-50_v1b_26w_4s.
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
-    model = Res2Net(Bottle2neck, [3, 4, 6, 3], baseWidth=26, scale=4, **kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls["res2net50_v1b_26w_4s"]))
-    return model
-
-
-def res2net101_v1b(pretrained=False, **kwargs):
-    """Constructs a Res2Net-50_v1b_26w_4s model.
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
-    model = Res2Net(Bottle2neck, [3, 4, 23, 3], baseWidth=26, scale=4, **kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls["res2net101_v1b_26w_4s"]))
-    return model
-
-
-def res2net50_v1b_26w_4s(pretrained=False, **kwargs):
-    """Constructs a Res2Net-50_v1b_26w_4s model.
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
-    model = Res2Net(Bottle2neck, [3, 4, 6, 3], baseWidth=26, scale=4, **kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls["res2net50_v1b_26w_4s"]))
-    return model
-
-
-def res2net101_v1b_26w_4s(pretrained=False, **kwargs):
-    """Constructs a Res2Net-50_v1b_26w_4s model.
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
-    model = Res2Net(Bottle2neck, [3, 4, 23, 3], baseWidth=26, scale=4, **kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls["res2net101_v1b_26w_4s"]))
-    return model
-
-
-def res2net152_v1b_26w_4s(pretrained=False, **kwargs):
-    """Constructs a Res2Net-50_v1b_26w_4s model.
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
-    model = Res2Net(Bottle2neck, [3, 8, 36, 3], baseWidth=26, scale=4, **kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls["res2net152_v1b_26w_4s"]))
+def custom_res2net50_v1b():
+    model = Res2Net(Bottle2neck, [1, 1, 1, 1], baseWidth=26, scale=4)
     return model

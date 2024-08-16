@@ -23,8 +23,8 @@ class FusionConnection(nn.Module):
     def __init__(self, dim) -> None:
         super().__init__()
 
-        self.cbam_1 = CBAM(dim)
-        self.cbam_2 = CBAM(dim)
+        # self.cbam_1 = CBAM(dim)
+        # self.cbam_2 = CBAM(dim)
         scales = [1, 3, 5]
 
         self.d_10 = DilationConvModule(
@@ -86,9 +86,9 @@ class FusionConnection(nn.Module):
 
         self.conv = ConvModule(len(scales) * dim, dim)
 
-    def forward(self, f1, f2):
-        x1 = self.cbam_1(f1)
-        x2 = self.cbam_2(f2)
+    def forward(self, x1, x2):
+        # x1 = self.cbam_1(f1)
+        # x2 = self.cbam_2(f2)
 
         x1_d_10 = self.d_10(x1)
         x1_d_11 = self.d_11(x1_d_10)
@@ -123,10 +123,10 @@ class Encoder(nn.Module):
         super().__init__()
 
         self.encoder = custom_res2net50_v1b()
-        self.skip_1 = FusionConnection(64)
-        self.skip_2 = FusionConnection(128)
-        self.skip_3 = FusionConnection(256)
-        self.skip_4 = FusionConnection(512)
+        self.skip_1 = FusionConnection(32)
+        self.skip_2 = FusionConnection(64)
+        self.skip_3 = FusionConnection(128)
+        self.skip_4 = FusionConnection(256)
 
     def forward(self, img_1, img_2):
         features_1 = self.encoder(img_1)
@@ -168,8 +168,8 @@ class FusionModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.encoder = Encoder()
-        self.embed_dim = 256
-        for i, dim in enumerate([64, 128, 256, 512]):
+        self.embed_dim = 64
+        for i, dim in enumerate([32, 64, 128, 256]):
             self.add_module(f"linear_c{i+1}", MLP(dim, self.embed_dim))
 
         self.linear_fuse = ConvModule(self.embed_dim * 4, self.embed_dim)
@@ -207,9 +207,28 @@ class FusionModel(nn.Module):
         return out
 
 
+from thop import profile
+from thop import clever_format
+
+
+def CalParams(model, x, y):
+    """
+    Usage:
+        Calculate Params and FLOPs via [THOP](https://github.com/Lyken17/pytorch-OpCounter)
+    Necessarity:
+        from thop import profile
+        from thop import clever_format
+    :param model:
+    :param input_tensor:
+    :return:
+    """
+    flops, params = profile(model, inputs=(x, y))
+    flops, params = clever_format([flops, params], "%.3f")
+    print("[Statistics Information]\nFLOPs: {}\nParams: {}".format(flops, params))
+
+
 if __name__ == "__main__":
     model = FusionModel()
     x = torch.randn(1, 1, 256, 256)
     y = torch.randn(1, 1, 256, 256)
-    out = model(x, y)
-    print(out.shape)
+    CalParams(model, x, y)
