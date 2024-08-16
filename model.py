@@ -112,7 +112,6 @@ class FusionConnection(nn.Module):
         xd_3 = x1_d_31 + x2_d_31
         xd_5 = x1_d_51 + x2_d_51
 
-        print(xd_1.shape, xd_3.shape, xd_5.shape)
         out = torch.cat([xd_1, xd_3, xd_5], dim=1)
         out = self.conv(out)
 
