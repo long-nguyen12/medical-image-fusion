@@ -94,7 +94,7 @@ class Bottle2neck(nn.Module):
 class Res2Net(nn.Module):
 
     def __init__(self, block, layers, baseWidth=26, scale=4):
-        self.inplanes = 32
+        self.inplanes = 64
         super(Res2Net, self).__init__()
         self.baseWidth = baseWidth
         self.scale = scale
