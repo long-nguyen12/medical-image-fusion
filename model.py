@@ -123,10 +123,10 @@ class Encoder(nn.Module):
         super().__init__()
 
         self.encoder = custom_res2net50_v1b()
-        self.skip_1 = FusionConnection(32)
-        self.skip_2 = FusionConnection(64)
-        self.skip_3 = FusionConnection(128)
-        self.skip_4 = FusionConnection(256)
+        self.skip_1 = FusionConnection(64)
+        self.skip_2 = FusionConnection(128)
+        self.skip_3 = FusionConnection(256)
+        self.skip_4 = FusionConnection(512)
 
     def forward(self, img_1, img_2):
         features_1 = self.encoder(img_1)
@@ -168,8 +168,8 @@ class FusionModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.encoder = Encoder()
-        self.embed_dim = 64
-        for i, dim in enumerate([32, 64, 128, 256]):
+        self.embed_dim = 128
+        for i, dim in enumerate([64, 128, 256, 512]):
             self.add_module(f"linear_c{i+1}", MLP(dim, self.embed_dim))
 
         self.linear_fuse = ConvModule(self.embed_dim * 4, self.embed_dim)
