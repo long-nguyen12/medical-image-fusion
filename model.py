@@ -6,7 +6,7 @@ from backbone.res2net import custom_res2net50_v1b
 
 
 class DilationConvModule(nn.Module):
-    def __init__(self, c1, c2, k, s, p=0, d=1, g=1):
+    def __init__(self, c1, c2, k, s=1, p=0, d=1, g=1):
         super().__init__()
         self.conv = nn.Conv2d(c1, c2, k, s, p, d, g, bias=False)
         self.bn = nn.BatchNorm2d(c2)
@@ -20,99 +20,59 @@ class DilationConvModule(nn.Module):
 
 
 class FusionConnection(nn.Module):
-    def __init__(self, dim) -> None:
+    def __init__(self, c1, c2, scales=(1, 2, 3)) -> None:
         super().__init__()
 
-        # self.cbam_1 = CBAM(dim)
-        # self.cbam_2 = CBAM(dim)
-        scales = [1, 3, 5]
-
-        self.d_10 = DilationConvModule(
-            dim,
-            dim,
-            (3, 1),
+        d = scales
+        self.d_1 = DilationConvModule(
+            c1,
+            c2,
+            (3, 3),
             1,
-            p=(1 * scales[0] + 1, 0),
-            d=(scales[0] + 1, 1),
-            g=dim,
+            p=(1 * d[0] + 1, 1 * d[0] + 1),
+            d=(d[0] + 1, d[0] + 1),
+            g=c2,
         )
-        self.d_11 = DilationConvModule(
-            dim,
-            dim,
-            (1, 3),
+        self.d_2 = DilationConvModule(
+            c1,
+            c2,
+            (3, 3),
             1,
-            p=(0, 1 * scales[0] + 1),
-            d=(1, scales[0] + 1),
-            g=dim,
+            p=(1 * d[1] + 1, 1 * d[1] + 1),
+            d=(d[1] + 1, d[1] + 1),
+            g=c2,
         )
-
-        self.d_30 = DilationConvModule(
-            dim,
-            dim,
-            (3, 1),
+        self.d_3 = DilationConvModule(
+            c1,
+            c2,
+            (3, 3),
             1,
-            p=(1 * scales[1] + 1, 0),
-            d=(scales[1] + 1, 1),
-            g=dim,
-        )
-        self.d_31 = DilationConvModule(
-            dim,
-            dim,
-            (1, 3),
-            1,
-            p=(0, 1 * scales[1] + 1),
-            d=(1, scales[1] + 1),
-            g=dim,
+            p=(1 * d[2] + 1, 1 * d[2] + 1),
+            d=(d[2] + 1, d[2] + 1),
+            g=c2,
         )
 
-        self.d_50 = DilationConvModule(
-            dim,
-            dim,
-            (3, 1),
-            1,
-            p=(1 * scales[2] + 1, 0),
-            d=(scales[2] + 1, 1),
-            g=dim,
-        )
-        self.d_51 = DilationConvModule(
-            dim,
-            dim,
-            (1, 3),
-            1,
-            p=(0, 1 * scales[2] + 1),
-            d=(1, scales[2] + 1),
-            g=dim,
-        )
-
-        self.conv = ConvModule(len(scales) * dim, dim)
+        self.conv = ConvModule(c1 * 2 + len(scales) * c2, c2)
 
     def forward(self, x1, x2):
-        # x1 = self.cbam_1(f1)
-        # x2 = self.cbam_2(f2)
 
-        x1_d_10 = self.d_10(x1)
-        x1_d_11 = self.d_11(x1_d_10)
+        x1_d_1 = self.d_1(x1)
 
-        x1_d_30 = self.d_30(x1)
-        x1_d_31 = self.d_31(x1_d_30)
+        x1_d_2 = self.d_2(x1)
 
-        x1_d_50 = self.d_50(x1)
-        x1_d_51 = self.d_51(x1_d_50)
+        x1_d_3 = self.d_3(x1)
 
-        x2_d_10 = self.d_10(x2)
-        x2_d_11 = self.d_11(x2_d_10)
+        x2_d_1 = self.d_1(x2)
 
-        x2_d_30 = self.d_30(x2)
-        x2_d_31 = self.d_31(x2_d_30)
+        x2_d_2 = self.d_2(x2)
 
-        x2_d_50 = self.d_50(x2)
-        x2_d_51 = self.d_51(x2_d_50)
+        x2_d_3 = self.d_3(x2)
 
-        xd_1 = x1_d_11 + x2_d_11
-        xd_3 = x1_d_31 + x2_d_31
-        xd_5 = x1_d_51 + x2_d_51
+        xd_1 = x1_d_1 + x2_d_1
+        xd_3 = x1_d_2 + x2_d_2
+        xd_5 = x1_d_3 + x2_d_3
 
-        out = torch.cat([xd_1, xd_3, xd_5], dim=1)
+        out = torch.cat([x1, x2, xd_1, xd_3, xd_5], dim=1)
         out = self.conv(out)
 
         return out
@@ -123,10 +83,10 @@ class Encoder(nn.Module):
         super().__init__()
 
         self.encoder = custom_res2net50_v1b()
-        self.skip_1 = FusionConnection(64)
-        self.skip_2 = FusionConnection(128)
-        self.skip_3 = FusionConnection(256)
-        self.skip_4 = FusionConnection(512)
+        self.skip_1 = FusionConnection(64, 64)
+        self.skip_2 = FusionConnection(128, 64)
+        self.skip_3 = FusionConnection(256, 64)
+        self.skip_4 = FusionConnection(512, 64)
 
     def forward(self, img_1, img_2):
         features_1 = self.encoder(img_1)
@@ -169,7 +129,7 @@ class FusionModel(nn.Module):
         super().__init__()
         self.encoder = Encoder()
         self.embed_dim = 128
-        for i, dim in enumerate([64, 128, 256, 512]):
+        for i, dim in enumerate([64, 64, 64, 64]):
             self.add_module(f"linear_c{i+1}", MLP(dim, self.embed_dim))
 
         self.linear_fuse = ConvModule(self.embed_dim * 4, self.embed_dim)
