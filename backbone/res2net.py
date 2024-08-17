@@ -1,7 +1,7 @@
 import torch.nn as nn
 import math
 import torch
-from attention.modules import ECALayer
+from attention.modules import ECALayer, SELayer
 
 
 class Bottle2neck(nn.Module):
@@ -46,7 +46,7 @@ class Bottle2neck(nn.Module):
         )
         self.bn3 = nn.BatchNorm2d(planes * self.expansion)
 
-        self.eca = ECALayer(planes * self.expansion)
+        self.eca = SELayer(planes * self.expansion)
 
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
