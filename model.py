@@ -56,17 +56,17 @@ class FusionConnection(nn.Module):
 
     def forward(self, x1, x2):
 
-        x1_d_1 = self.d_1(x1)
+        x1_d_1 = self.d_1(x1) + x1
 
-        x1_d_2 = self.d_2(x1)
+        x1_d_2 = self.d_2(x1) + x1
 
-        x1_d_3 = self.d_3(x1)
+        x1_d_3 = self.d_3(x1) + x1
 
-        x2_d_1 = self.d_1(x2)
+        x2_d_1 = self.d_1(x2) + x2
 
-        x2_d_2 = self.d_2(x2)
+        x2_d_2 = self.d_2(x2) + x2
 
-        x2_d_3 = self.d_3(x2)
+        x2_d_3 = self.d_3(x2) + x2
 
         xd_1 = x1_d_1 + x2_d_1
         xd_3 = x1_d_2 + x2_d_2
