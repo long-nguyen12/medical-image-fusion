@@ -3,6 +3,7 @@ from torch import nn
 import torch
 from torch.nn import functional as F
 from backbone.res2net import custom_res2net50_v1b
+from head.fpn import FPNHead
 
 
 class DilationConvModule(nn.Module):
@@ -56,17 +57,17 @@ class FusionConnection(nn.Module):
 
     def forward(self, x1, x2):
 
-        x1_d_1 = self.d_1(x1) + x1
+        x1_d_1 = self.d_1(x1)
 
-        x1_d_2 = self.d_2(x1) + x1
+        x1_d_2 = self.d_2(x1)
 
-        x1_d_3 = self.d_3(x1) + x1
+        x1_d_3 = self.d_3(x1)
 
-        x2_d_1 = self.d_1(x2) + x2
+        x2_d_1 = self.d_1(x2)
 
-        x2_d_2 = self.d_2(x2) + x2
+        x2_d_2 = self.d_2(x2)
 
-        x2_d_3 = self.d_3(x2) + x2
+        x2_d_3 = self.d_3(x2)
 
         xd_1 = x1_d_1 + x2_d_1
         xd_3 = x1_d_2 + x2_d_2
@@ -128,37 +129,12 @@ class FusionModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.encoder = Encoder()
-        self.embed_dim = 128
-        for i, dim in enumerate([32, 32, 32, 32]):
-            self.add_module(f"linear_c{i+1}", MLP(dim, self.embed_dim))
-
-        self.linear_fuse = ConvModule(self.embed_dim * 4, self.embed_dim)
-        self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
-        self.dropout = nn.Dropout2d(0.1)
+        self.decoder = FPNHead([32, 32, 32, 32], 64, 1)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x, y):
         features = self.encoder(x, y)
-        B, _, H, W = features[0].shape
-
-        outs = [
-            self.linear_c1(features[0])
-            .permute(0, 2, 1)
-            .reshape(B, -1, *features[0].shape[-2:])
-        ]
-
-        for i, feature in enumerate(features[1:]):
-            cf = (
-                eval(f"self.linear_c{i+2}")(feature)
-                .permute(0, 2, 1)
-                .reshape(B, -1, *feature.shape[-2:])
-            )
-            outs.append(
-                F.interpolate(cf, size=(H, W), mode="bilinear", align_corners=False)
-            )
-
-        out = self.linear_fuse(torch.cat(outs[::-1], dim=1))
-        out = self.linear_pred(self.dropout(out))
+        out = self.decoder(features)
         out = self.sigmoid(out)
         out = F.interpolate(
             out, size=x.size()[2:], mode="bilinear", align_corners=False
