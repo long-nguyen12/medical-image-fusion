@@ -85,9 +85,9 @@ class Encoder(nn.Module):
 
         self.encoder = custom_res2net50_v1b()
         self.skip_1 = FusionConnection(32, 32)
-        self.skip_2 = FusionConnection(64, 32)
-        self.skip_3 = FusionConnection(128, 32)
-        self.skip_4 = FusionConnection(256, 32)
+        self.skip_2 = FusionConnection(64, 64)
+        self.skip_3 = FusionConnection(128, 128)
+        self.skip_4 = FusionConnection(256, 256)
 
     def forward(self, img_1, img_2):
         features_1 = self.encoder(img_1)
@@ -124,17 +124,52 @@ class ConvModule(nn.Module):
     def forward(self, x):
         return self.activate(self.bn(self.conv(x)))
 
+class SELayer(nn.Module):
+    def __init__(self, channel, reduction=16):
+        super(SELayer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channel, channel // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channel // reduction, channel, bias=False),
+            nn.Sigmoid()
+        )
 
+    def forward(self, x):
+        b, c, w, h = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        return x * y.expand_as(x)
+    
 class FusionModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.encoder = Encoder()
-        self.decoder = FPNHead([32, 32, 32, 32], 64, 1)
+        self.embed_dim = 64
+        for i, dim in enumerate([32, 64, 128, 256]):
+            self.add_module(f"linear_c{i+1}", ConvModule(dim, self.embed_dim))
+            
+        self.se = SELayer(self.embed_dim * 4)
+
+        self.linear_fuse = ConvModule(self.embed_dim * 4, self.embed_dim)
+        self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
+        self.dropout = nn.Dropout2d(0.1)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x, y):
         features = self.encoder(x, y)
-        out = self.decoder(features)
+        B, _, H, W = features[0].shape
+
+        outs = [self.linear_c1(features[0])]
+
+        for i, feature in enumerate(features[1:]):
+            cf = eval(f"self.linear_c{i+2}")(feature)
+            outs.append(
+                F.interpolate(cf, size=(H, W), mode="bilinear", align_corners=False)
+            )
+        out = self.se(torch.cat(outs[::-1], dim=1))
+        out = self.linear_fuse(out)
+        out = self.linear_pred(self.dropout(out))
         out = self.sigmoid(out)
         out = F.interpolate(
             out, size=x.size()[2:], mode="bilinear", align_corners=False

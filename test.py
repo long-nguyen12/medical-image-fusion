@@ -1,6 +1,5 @@
 import argparse
 import os
-from datetime import datetime
 from glob import glob
 
 import albumentations as A
@@ -9,12 +8,12 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from PIL import Image
-from torch.autograd import Variable
 from torchvision import transforms
 
 from model import FusionModel
 from torchvision.utils import save_image
-from metrics import Qmi
+from eval import psnr, ssim, mutual_information
+from evaluation_metrics import fsim, nmi, en
 
 
 class Dataset(torch.utils.data.Dataset):
@@ -69,41 +68,58 @@ class Dataset(torch.utils.data.Dataset):
 
 
 def get_scores(src_1, src_2, prs):
-    mean_qmi = 0
-    for gt_1, gt_2, pr in zip(src_1, src_2, prs):
-        mean_qmi += Qmi(gt_1, gt_2, pr)
+    psnrs = []
+    ssims = []
+    nmis = []
+    mis = []
+    fsims = []
+    ens = []
 
-    mean_qmi /= len(src_1)
+    for gt1, gt2, pr in zip(src_1, src_2, prs):
+        gt1 = gt1.squeeze(0).squeeze(0).cpu().clamp(min=0, max=1)
+        gt2 = gt2.squeeze(0).squeeze(0).cpu().clamp(min=0, max=1)
+        pr = pr.squeeze(0).squeeze(0).detach().cpu().clamp(min=0, max=1)
 
-    print("scores: Qmi={}".format(mean_qmi))
+        # psnr_val1 = psnr(pr, gt1)
+        # psnr_val2 = psnr(pr, gt2)
+        # psnr_val = (psnr_val1 + psnr_val2) / 2
+        # psnrs.append(psnr_val.item())
 
+        ssim_val1 = ssim(pr, gt1)
+        ssim_val2 = ssim(pr, gt2)
+        ssim_val = (ssim_val1 + ssim_val2) / 2
+        ssims.append(ssim_val)
 
-@torch.no_grad()
-def inference(model, dataloader, args=None):
-    print("#" * 20)
-    torch.cuda.empty_cache()
-    model.eval()
-    device = torch.device("cuda")
+        nmi_val1 = nmi(pr, gt1)
+        nmi_val2 = nmi(pr, gt2)
+        nmi_val = (nmi_val1 + nmi_val2) / 2
+        nmis.append(nmi_val)
 
-    src_1 = []
-    src_2 = []
-    src_3 = []
-    prs = []
-    for i, pack in enumerate(test_loader, start=1):
-        img_1, img_2, img_3, img_name = pack
+        mi_val1 = mutual_information(pr, gt1)
+        mi_val2 = mutual_information(pr, gt2)
+        mi_val = (mi_val1 + mi_val2) / 2
+        mis.append(mi_val)
 
-        img_1 = img_1.to(device)
-        img_2 = img_2.to(device)
-        if img_3 != None:
-            img_3 = img_3.to(device)
+        fsim_val1 = fsim(pr, gt1)
+        fsim_val2 = fsim(pr, gt2)
+        fsim_val = (fsim_val1 + fsim_val2) / 2
+        fsims.append(fsim_val)
 
-        res = model(img_1, img_2)
-        src_1.append(img_1)
-        src_2.append(img_2)
-        src_3.append(img_3)
-        prs.append(res)
+        en_val = en(pr)
+        ens.append(en_val)
 
-    get_scores(src_1, src_2, prs)
+    # print("psnrs")
+    # print(sum(psnrs) / len(psnrs))
+    print("ssims")
+    print(sum(ssims) / len(ssims))
+    print("nmis")
+    print(sum(nmis) / len(nmis))
+    print("mis")
+    print(sum(mis) / len(mis))
+    print("fsims")
+    print(sum(fsims) / len(fsims))
+    print("entropy")
+    print(sum(ens) / len(ens))
 
 
 if __name__ == "__main__":
@@ -123,10 +139,9 @@ if __name__ == "__main__":
     parser.add_argument("--train_save", type=str, default="ours")
     args = parser.parse_args()
 
-    device = torch.device("cuda")
+    device = torch.device("cpu")
 
     ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
-    # ds = ["PET-MRI", "SPECT-MRI"]
     for _ds in ds:
         save_path = "results/{}/".format(_ds)
         if not os.path.exists(save_path):
@@ -181,15 +196,16 @@ if __name__ == "__main__":
             img_2 = img_2.to(device)
 
             res = model(img_1, img_2)
+            prs.append(res)
 
             res = res.data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8) * 255
             fused_img = res
 
-            src_1.append(img_1.cpu().numpy())
-            src_2.append(img_2.cpu().numpy())
+            src_1.append(img_1)
+            src_2.append(img_2)
             src_3.append(img_3)
-            prs.append(res.astype(np.uint8))
+            # prs.append(res.astype(np.uint8))
 
             # res = res.data.cpu().numpy()
             # res = (res - res.min()) / (res.max() - res.min() + 1e-8) * 255

@@ -3,16 +3,11 @@ import os
 from datetime import datetime
 from glob import glob
 
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
 import cv2
 import numpy as np
 import torch
-import torch.nn.functional as F
-from torch.autograd import Variable
 
 from utils import AvgMeter, clip_gradient
-from PIL import Image
 from torchvision import transforms
 
 # from val import inference
@@ -39,7 +34,7 @@ class Dataset(torch.utils.data.Dataset):
         if self.type == "CT":
             source_1 = cv2.imread(source_1_path, cv2.IMREAD_GRAYSCALE)
             source_2 = cv2.imread(source_2_path, cv2.IMREAD_GRAYSCALE)
-            
+
             if self.transform is not None:
                 source_1 = self.transform(source_1)
                 source_2 = self.transform(source_2)
