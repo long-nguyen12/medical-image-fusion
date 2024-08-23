@@ -32,7 +32,6 @@ class FusionConnection(nn.Module):
             1,
             p=(1 * d[0] + 1, 1 * d[0] + 1),
             d=(d[0] + 1, d[0] + 1),
-            g=c2,
         )
         self.d_2 = DilationConvModule(
             c1,
@@ -41,7 +40,6 @@ class FusionConnection(nn.Module):
             1,
             p=(1 * d[1] + 1, 1 * d[1] + 1),
             d=(d[1] + 1, d[1] + 1),
-            g=c2,
         )
         self.d_3 = DilationConvModule(
             c1,
@@ -50,7 +48,6 @@ class FusionConnection(nn.Module):
             1,
             p=(1 * d[2] + 1, 1 * d[2] + 1),
             d=(d[2] + 1, d[2] + 1),
-            g=c2,
         )
 
         self.conv = ConvModule(c1 * 2 + len(scales) * c2, c2)
@@ -84,10 +81,10 @@ class Encoder(nn.Module):
         super().__init__()
 
         self.encoder = custom_res2net50_v1b()
-        self.skip_1 = FusionConnection(32, 32)
-        self.skip_2 = FusionConnection(64, 64)
-        self.skip_3 = FusionConnection(128, 128)
-        self.skip_4 = FusionConnection(256, 256)
+        self.skip_1 = FusionConnection(16, 32)
+        self.skip_2 = FusionConnection(32, 32)
+        self.skip_3 = FusionConnection(64, 32)
+        self.skip_4 = FusionConnection(128, 32)
 
     def forward(self, img_1, img_2):
         features_1 = self.encoder(img_1)
@@ -124,6 +121,7 @@ class ConvModule(nn.Module):
     def forward(self, x):
         return self.activate(self.bn(self.conv(x)))
 
+
 class SELayer(nn.Module):
     def __init__(self, channel, reduction=16):
         super(SELayer, self).__init__()
@@ -132,7 +130,7 @@ class SELayer(nn.Module):
             nn.Linear(channel, channel // reduction, bias=False),
             nn.ReLU(inplace=True),
             nn.Linear(channel // reduction, channel, bias=False),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
 
     def forward(self, x):
@@ -140,15 +138,16 @@ class SELayer(nn.Module):
         y = self.avg_pool(x).view(b, c)
         y = self.fc(y).view(b, c, 1, 1)
         return x * y.expand_as(x)
-    
+
+
 class FusionModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.encoder = Encoder()
         self.embed_dim = 64
-        for i, dim in enumerate([32, 64, 128, 256]):
+        for i, dim in enumerate([32, 32, 32, 32]):
             self.add_module(f"linear_c{i+1}", ConvModule(dim, self.embed_dim))
-            
+
         self.se = SELayer(self.embed_dim * 4)
 
         self.linear_fuse = ConvModule(self.embed_dim * 4, self.embed_dim)
