@@ -139,7 +139,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_save", type=str, default="ours")
     args = parser.parse_args()
 
-    device = torch.device("cpu")
+    device = torch.device("cuda")
 
     ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
     for _ds in ds:
