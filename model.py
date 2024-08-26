@@ -166,8 +166,8 @@ class FusionModel(nn.Module):
             outs.append(
                 F.interpolate(cf, size=(H, W), mode="bilinear", align_corners=False)
             )
-        out = self.se(torch.cat(outs[::-1], dim=1))
-        out = self.linear_fuse(out)
+        # out = self.se(torch.cat(outs[::-1], dim=1))
+        out = self.linear_fuse(torch.cat(outs[::-1], dim=1))
         out = self.linear_pred(self.dropout(out))
         out = self.sigmoid(out)
         out = F.interpolate(
