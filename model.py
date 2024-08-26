@@ -81,10 +81,10 @@ class Encoder(nn.Module):
         super().__init__()
 
         self.encoder = custom_res2net50_v1b()
-        self.skip_1 = FusionConnection(16, 32)
-        self.skip_2 = FusionConnection(32, 32)
-        self.skip_3 = FusionConnection(64, 32)
-        self.skip_4 = FusionConnection(128, 32)
+        self.skip_1 = FusionConnection(32, 32)
+        self.skip_2 = FusionConnection(64, 32)
+        self.skip_3 = FusionConnection(128, 32)
+        self.skip_4 = FusionConnection(256, 32)
 
     def forward(self, img_1, img_2):
         features_1 = self.encoder(img_1)
