@@ -13,7 +13,7 @@ from torchvision import transforms
 # from val import inference
 from model import FusionModel
 import pytorch_msssim
-from losses import CharbonnierLoss_IR, CharbonnierLoss_VI, tv_vi, tv_ir
+from losses import CharbonnierLoss_IR, CharbonnierLoss_VI, tv_vi, tv_ir, ssim_loss
 
 
 class Dataset(torch.utils.data.Dataset):
@@ -74,7 +74,7 @@ if __name__ == "__main__":
         help="path to train dataset",
     )
     parser.add_argument("--train_save", type=str, default="ours")
-    parser.add_argument("--weight", default=[0.03, 1000, 10, 100], type=float)
+    parser.add_argument("--weight", default=[1, 1, 1, 1], type=float)
 
     args = parser.parse_args()
 
@@ -141,6 +141,7 @@ if __name__ == "__main__":
         criterion_CharbonnierLoss_VI = CharbonnierLoss_VI
         criterion_tv_ir = tv_ir
         criterion_tv_vi = tv_vi
+        criterion_ssim = ssim_loss
 
         print("#" * 20, "Start Training", "#" * 20)
         for epoch in range(start_epoch, epochs + 1):
@@ -165,12 +166,8 @@ if __name__ == "__main__":
                     )
                     loss_tv_ir = weight[2] * criterion_tv_ir(out, img_1)
                     loss_tv_vi = weight[3] * criterion_tv_vi(out, img_2)
-                    loss = (
-                        _CharbonnierLoss_IR
-                        + _CharbonnierLoss_VI
-                        + loss_tv_ir
-                        + loss_tv_vi
-                    )
+                    loss_ssim = criterion_ssim(out, img_1, img_2)
+                    loss = _CharbonnierLoss_IR + _CharbonnierLoss_VI + loss_ssim
 
                     loss.backward()
 
