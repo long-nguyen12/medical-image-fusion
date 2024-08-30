@@ -145,12 +145,13 @@ class FusionModel(nn.Module):
         super().__init__()
         self.encoder = Encoder()
         self.embed_dim = 64
+        self.dim = 32
         for i, dim in enumerate([32, 32, 32, 32]):
             self.add_module(f"linear_c{i+1}", MLP(dim, self.embed_dim))
 
         self.se = SELayer(self.embed_dim * 4)
 
-        self.linear_fuse = ConvModule(self.embed_dim * 4, self.embed_dim)
+        self.linear_fuse = ConvModule(self.dim * 4, self.embed_dim)
         self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
         self.dropout = nn.Dropout2d(0.1)
         self.sigmoid = nn.Sigmoid()
@@ -158,11 +159,11 @@ class FusionModel(nn.Module):
     def forward(self, x, y):
         features = self.encoder(x, y)
         B, _, H, W = features[0].shape
+        outs = []
+        # outs = [self.linear_c1(features[0]).permute(0, 2, 1).reshape(B, -1, *features[0].shape[-2:])]
 
-        outs = [self.linear_c1(features[0]).permute(0, 2, 1).reshape(B, -1, *features[0].shape[-2:])]
-
-        for i, feature in enumerate(features[1:]):
-            cf = eval(f"self.linear_c{i+2}")(feature).permute(0, 2, 1).reshape(B, -1, *feature.shape[-2:])
+        for i, cf in enumerate(features):
+            # cf = eval(f"self.linear_c{i+2}")(feature).permute(0, 2, 1).reshape(B, -1, *feature.shape[-2:])
             outs.append(
                 F.interpolate(cf, size=(H, W), mode="bilinear", align_corners=False)
             )
