@@ -80,10 +80,10 @@ def get_scores(src_1, src_2, prs):
         gt2 = gt2.squeeze(0).squeeze(0).cpu().clamp(min=0, max=1)
         pr = pr.squeeze(0).squeeze(0).detach().cpu().clamp(min=0, max=1)
 
-        # psnr_val1 = psnr(pr, gt1)
-        # psnr_val2 = psnr(pr, gt2)
-        # psnr_val = (psnr_val1 + psnr_val2) / 2
-        # psnrs.append(psnr_val.item())
+        psnr_val1 = psnr(pr, gt1)
+        psnr_val2 = psnr(pr, gt2)
+        psnr_val = (psnr_val1 + psnr_val2) / 2
+        psnrs.append(psnr_val)
 
         ssim_val1 = ssim(pr, gt1)
         ssim_val2 = ssim(pr, gt2)
@@ -108,8 +108,8 @@ def get_scores(src_1, src_2, prs):
         en_val = en(pr)
         ens.append(en_val)
 
-    # print("psnrs")
-    # print(sum(psnrs) / len(psnrs))
+    print("psnrs")
+    print(sum(psnrs) / len(psnrs))
     print("ssims")
     print(sum(ssims) / len(ssims))
     print("nmis")
