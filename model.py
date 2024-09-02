@@ -4,8 +4,8 @@ import torch
 from torch.nn import functional as F
 from backbone.res2net import custom_res2net50_v1b
 from head.fpn import FPNHead
-
-
+from backbone.residual_cbam import Residual_CBAM_Block
+from head.decoder import Decoder
 class DilationConvModule(nn.Module):
     def __init__(self, c1, c2, k, s=1, p=0, d=1, g=1):
         super().__init__()
@@ -80,7 +80,7 @@ class Encoder(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-        self.encoder = custom_res2net50_v1b()
+        self.encoder = Residual_CBAM_Block(in_channels=1)
         self.skip_1 = FusionConnection(32, 32)
         self.skip_2 = FusionConnection(64, 32)
         self.skip_3 = FusionConnection(128, 32)
@@ -122,60 +122,41 @@ class ConvModule(nn.Module):
         return self.activate(self.bn(self.conv(x)))
 
 
-class SELayer(nn.Module):
-    def __init__(self, channel, reduction=16):
-        super(SELayer, self).__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Sequential(
-            nn.Linear(channel, channel // reduction, bias=False),
-            nn.ReLU(inplace=True),
-            nn.Linear(channel // reduction, channel, bias=False),
-            nn.Sigmoid(),
-        )
-
-    def forward(self, x):
-        b, c, w, h = x.size()
-        y = self.avg_pool(x).view(b, c)
-        y = self.fc(y).view(b, c, 1, 1)
-        return x * y.expand_as(x)
-
-
 class FusionModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.encoder = Encoder()
-        self.embed_dim = 64
-        self.dim = 32
-        for i, dim in enumerate([32, 32, 32, 32]):
-            self.add_module(f"linear_c{i+1}", MLP(dim, self.embed_dim))
+        self.decoder = Decoder()
+        # self.embed_dim = 64
+        # self.dim = 32
+        # for i, dim in enumerate([32, 32, 32, 32]):
+        #     self.add_module(f"linear_c{i+1}", MLP(dim, self.embed_dim))
 
-        self.se = SELayer(self.embed_dim * 4)
 
-        self.linear_fuse = ConvModule(self.dim * 4, self.embed_dim)
-        self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
-        self.dropout = nn.Dropout2d(0.1)
-        self.sigmoid = nn.Sigmoid()
+        # self.linear_fuse = ConvModule(self.dim * 4, self.embed_dim)
+        # self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
+        # self.dropout = nn.Dropout2d(0.1)
+        # self.sigmoid = nn.Sigmoid()
 
     def forward(self, x, y):
         features = self.encoder(x, y)
-        B, _, H, W = features[0].shape
-        outs = []
-        # outs = [self.linear_c1(features[0]).permute(0, 2, 1).reshape(B, -1, *features[0].shape[-2:])]
-
-        for i, cf in enumerate(features):
-            # cf = eval(f"self.linear_c{i+2}")(feature).permute(0, 2, 1).reshape(B, -1, *feature.shape[-2:])
-            outs.append(
-                F.interpolate(cf, size=(H, W), mode="bilinear", align_corners=False)
-            )
-        # out = self.se(torch.cat(outs[::-1], dim=1))
-        out = self.linear_fuse(torch.cat(outs[::-1], dim=1))
-        out = self.linear_pred(self.dropout(out))
-        out = self.sigmoid(out)
-        out = F.interpolate(
-            out, size=x.size()[2:], mode="bilinear", align_corners=False
-        )
-
+        out = self.decoder(features)
         return out
+        # B, _, H, W = features[0].shape
+        # outs = []
+
+        # for i, cf in enumerate(features):
+        #     outs.append(
+        #         F.interpolate(cf, size=(H, W), mode="bilinear", align_corners=False)
+        #     )
+        # out = self.linear_fuse(torch.cat(outs[::-1], dim=1))
+        # out = self.linear_pred(self.dropout(out))
+        # out = self.sigmoid(out)
+        # out = F.interpolate(
+        #     out, size=x.size()[2:], mode="bilinear", align_corners=False
+        # )
+
+        # return out
 
 
 from thop import profile
