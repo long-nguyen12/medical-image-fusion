@@ -82,9 +82,9 @@ class Encoder(nn.Module):
 
         self.encoder = Residual_CBAM_Block(in_channels=1)
         self.skip_1 = FusionConnection(32, 32)
-        self.skip_2 = FusionConnection(64, 32)
-        self.skip_3 = FusionConnection(128, 32)
-        self.skip_4 = FusionConnection(256, 32)
+        self.skip_2 = FusionConnection(64, 64)
+        self.skip_3 = FusionConnection(128, 128)
+        self.skip_4 = FusionConnection(256, 256)
 
     def forward(self, img_1, img_2):
         features_1 = self.encoder(img_1)

@@ -40,7 +40,7 @@ class ResBlock(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, channels=[32, 32, 32, 32]):
+    def __init__(self, channels=[32, 64, 128, 256]):
         super(Decoder, self).__init__()
 
         self.res_1 = ResBlock(channels[0] * 2, 1)
