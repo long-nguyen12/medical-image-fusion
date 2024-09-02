@@ -36,8 +36,8 @@ class ResBlock(nn.Module):
         out = self.conv2(out)
         out = self.bn2(out)
 
-        if self.attention:
-            out = self.cbam(out)
+        # if self.attention:
+        #     out = self.cbam(out)
 
         out += residual
         out = self.relu(out)
@@ -48,12 +48,12 @@ class Residual_CBAM_Block(nn.Module):
     def __init__(self, in_channels=1, channels=[32, 64, 128, 256]):
         super(Residual_CBAM_Block, self).__init__()
         
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(32)
+        self.conv1 = nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(16)
         self.relu = nn.ReLU()
         # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         
-        self.res_1 = ResBlock(32, channels[0], stride=1)
+        self.res_1 = ResBlock(16, channels[0], stride=1)
         self.res_2 = ResBlock(channels[0], channels[1], stride=2)
         self.res_3 = ResBlock(channels[1], channels[2], stride=2)
         self.res_4 = ResBlock(channels[2], channels[3], stride=2)
