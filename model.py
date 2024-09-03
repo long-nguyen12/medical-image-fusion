@@ -6,6 +6,8 @@ from backbone.res2net import custom_res2net50_v1b
 from head.fpn import FPNHead
 from backbone.residual_cbam import Residual_CBAM_Block
 from head.decoder import Decoder
+
+
 class DilationConvModule(nn.Module):
     def __init__(self, c1, c2, k, s=1, p=0, d=1, g=1):
         super().__init__()
@@ -126,37 +128,36 @@ class FusionModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.encoder = Encoder()
-        self.decoder = Decoder()
-        # self.embed_dim = 64
-        # self.dim = 32
-        # for i, dim in enumerate([32, 32, 32, 32]):
-        #     self.add_module(f"linear_c{i+1}", MLP(dim, self.embed_dim))
+        # self.decoder = Decoder()
+        self.embed_dim = 64
+        self.dim = 32
+        for i, dim in enumerate([32, 64, 128, 256]):
+            self.add_module(f"linear_c{i+1}", MLP(dim, self.embed_dim))
 
-
-        # self.linear_fuse = ConvModule(self.dim * 4, self.embed_dim)
-        # self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
-        # self.dropout = nn.Dropout2d(0.1)
-        # self.sigmoid = nn.Sigmoid()
+        self.linear_fuse = ConvModule(sum([32, 64, 128, 256]), self.embed_dim)
+        self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
+        self.dropout = nn.Dropout2d(0.1)
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x, y):
         features = self.encoder(x, y)
-        out = self.decoder(features)
-        return out
-        # B, _, H, W = features[0].shape
-        # outs = []
-
-        # for i, cf in enumerate(features):
-        #     outs.append(
-        #         F.interpolate(cf, size=(H, W), mode="bilinear", align_corners=False)
-        #     )
-        # out = self.linear_fuse(torch.cat(outs[::-1], dim=1))
-        # out = self.linear_pred(self.dropout(out))
-        # out = self.sigmoid(out)
-        # out = F.interpolate(
-        #     out, size=x.size()[2:], mode="bilinear", align_corners=False
-        # )
-
+        # out = self.decoder(features)
         # return out
+        B, _, H, W = features[0].shape
+        outs = []
+
+        for i, cf in enumerate(features):
+            outs.append(
+                F.interpolate(cf, size=(H, W), mode="bilinear", align_corners=False)
+            )
+        out = self.linear_fuse(torch.cat(outs[::-1], dim=1))
+        out = self.linear_pred(self.dropout(out))
+        out = self.sigmoid(out)
+        out = F.interpolate(
+            out, size=x.size()[2:], mode="bilinear", align_corners=False
+        )
+
+        return out
 
 
 from thop import profile
