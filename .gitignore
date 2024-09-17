@@ -8,3 +8,5 @@ pretrained/
 *.zip
 
 results/
+
+data/
