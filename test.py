@@ -2,11 +2,9 @@ import argparse
 import os
 from glob import glob
 
-import albumentations as A
 import cv2
 import numpy as np
 import torch
-import torch.nn.functional as F
 from PIL import Image
 from torchvision import transforms
 

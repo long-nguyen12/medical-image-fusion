@@ -11,7 +11,7 @@ import numpy as np
 import sklearn.metrics as skm
 import torch
 from skimage.metrics import peak_signal_noise_ratio, normalized_mutual_information
-from torchmetrics import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
+from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 #from TMQI import TMQI, TMQIr
 
 def psnr(img_pred: torch.Tensor, img_true: torch.Tensor):
