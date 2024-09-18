@@ -141,7 +141,7 @@ if __name__ == "__main__":
 
     device = torch.device("cuda")
 
-    ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
+    ds = ["PET-MRI", "SPECT-MRI"]
     for _ds in ds:
         save_path = "results/{}/".format(_ds)
         if not os.path.exists(save_path):

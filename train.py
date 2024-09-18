@@ -81,7 +81,7 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     epochs = args.num_epochs
-    ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
+    ds = ["PET-MRI", "SPECT-MRI"]
     for _ds in ds:
         save_path = "snapshots/{}/{}/".format(args.train_save, _ds)
         if not os.path.exists(save_path):

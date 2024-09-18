@@ -85,8 +85,8 @@ class Encoder(nn.Module):
         self.encoder = Residual_CBAM_Block(in_channels=1)
         self.skip_1 = FusionConnection(32, 32)
         self.skip_2 = FusionConnection(64, 64)
-        self.skip_3 = FusionConnection(128, 128)
-        self.skip_4 = FusionConnection(256, 256)
+        self.skip_3 = FusionConnection(96, 96)
+        self.skip_4 = FusionConnection(128, 128)
 
     def forward(self, img_1, img_2):
         features_1 = self.encoder(img_1)
@@ -131,10 +131,10 @@ class FusionModel(nn.Module):
         # self.decoder = Decoder()
         self.embed_dim = 64
         self.dim = 32
-        for i, dim in enumerate([32, 64, 128, 256]):
-            self.add_module(f"linear_c{i+1}", MLP(dim, self.embed_dim))
+        # for i, dim in enumerate([32, 64, 128, 256]):
+        #     self.add_module(f"linear_c{i+1}", MLP(dim, self.embed_dim))
 
-        self.linear_fuse = ConvModule(sum([32, 64, 128, 256]), self.embed_dim)
+        self.linear_fuse = ConvModule(sum([32, 64, 96, 128]), self.embed_dim)
         self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
         self.dropout = nn.Dropout2d(0.1)
         self.sigmoid = nn.Sigmoid()
