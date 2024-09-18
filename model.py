@@ -2,10 +2,7 @@ from attention.modules import CBAM
 from torch import nn
 import torch
 from torch.nn import functional as F
-from backbone.res2net import custom_res2net50_v1b
-from head.fpn import FPNHead
 from backbone.residual_cbam import Residual_CBAM_Block
-from head.decoder import Decoder
 
 
 class DilationConvModule(nn.Module):
@@ -52,7 +49,7 @@ class FusionConnection(nn.Module):
             d=(d[2] + 1, d[2] + 1),
         )
 
-        self.conv = ConvModule(c1 * 2 + len(scales) * c2, c2)
+        self.conv = ConvModule(2 * c2, c2)
 
     def forward(self, x1, x2):
 
@@ -68,11 +65,12 @@ class FusionConnection(nn.Module):
 
         x2_d_3 = self.d_3(x2)
 
-        xd_1 = x1_d_1 + x2_d_1
-        xd_3 = x1_d_2 + x2_d_2
-        xd_5 = x1_d_3 + x2_d_3
+        xd_1 = torch.cat([x1_d_1, x2_d_1], dim=1)
+        xd_3 = torch.cat([x1_d_2, x2_d_2], dim=1)
+        xd_5 = torch.cat([x1_d_3, x2_d_3], dim=1)
 
-        out = torch.cat([x1, x2, xd_1, xd_3, xd_5], dim=1)
+        out = xd_1 + xd_3 + xd_5
+        # out = torch.cat([xd_1, xd_3, xd_5], dim=1)
         out = self.conv(out)
 
         return out
