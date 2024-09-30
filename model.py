@@ -2,7 +2,7 @@ from attention.modules import CBAM
 from torch import nn
 import torch
 from torch.nn import functional as F
-from backbone.residual_cbam import Residual_CBAM_Block
+from backbone.residual_cbam import Residual_CBAM_Block, ResBlock
 
 
 class DilationConvModule(nn.Module):
@@ -51,18 +51,17 @@ class FusionConnection(nn.Module):
 
         self.conv = ConvModule(2 * c2, c2)
 
-    def forward(self, x1, x2):
+    def forward(self, x1, x2, guided=None):
+        if guided is not None:
+            x1 = x1 + guided
+            x2 = x2 + guided
 
         x1_d_1 = self.d_1(x1)
-
         x1_d_2 = self.d_2(x1)
-
         x1_d_3 = self.d_3(x1)
 
         x2_d_1 = self.d_1(x2)
-
         x2_d_2 = self.d_2(x2)
-
         x2_d_3 = self.d_3(x2)
 
         xd_1 = torch.cat([x1_d_1, x2_d_1], dim=1)
@@ -86,18 +85,38 @@ class Encoder(nn.Module):
         self.skip_3 = FusionConnection(96, 96)
         self.skip_4 = FusionConnection(128, 128)
 
+        self.cats = ResBlock(2, 32, 1)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+
+        self.up_1 = ConvModule(32, 64)
+        self.up_2 = ConvModule(64, 96)
+        self.up_3 = ConvModule(96, 128)
+
     def forward(self, img_1, img_2):
+        inputs = torch.cat([x, y], dim=1)
+        guided_feature = self.cats(inputs)
+
         features_1 = self.encoder(img_1)
         features_2 = self.encoder(img_2)
 
         x1, x2, x3, x4 = features_1
         y1, y2, y3, y4 = features_2
 
-        con_1 = self.skip_1(x1, y1)
-        con_2 = self.skip_2(x2, y2)
-        con_3 = self.skip_3(x3, y3)
-        con_4 = self.skip_4(x4, y4)
-        return con_1, con_2, con_3, con_4
+        skip_mod_1 = self.skip_1(x1, y1, guided_feature)
+        _skip_mod_1 = self.maxpool(skip_mod_1)
+        _skip_mod_1 = self.up_1(_skip_mod_1)
+
+        skip_mod_2 = self.skip_2(x2, y2, _skip_mod_1)
+        _skip_mod_2 = self.maxpool(skip_mod_2)
+        _skip_mod_2 = self.up_2(_skip_mod_2)
+
+        skip_mod_3 = self.skip_3(x3, y3, _skip_mod_2)
+        _skip_mod_3 = self.maxpool(skip_mod_3)
+        _skip_mod_3 = self.up_3(_skip_mod_3)
+
+        skip_mod_4 = self.skip_4(x4, y4, _skip_mod_3)
+
+        return skip_mod_1, skip_mod_2, skip_mod_3, skip_mod_4
 
 
 class MLP(nn.Module):
@@ -129,8 +148,6 @@ class FusionModel(nn.Module):
         # self.decoder = Decoder()
         self.embed_dim = 64
         self.dim = 32
-        # for i, dim in enumerate([32, 64, 128, 256]):
-        #     self.add_module(f"linear_c{i+1}", MLP(dim, self.embed_dim))
 
         self.linear_fuse = ConvModule(sum([32, 64, 96, 128]), self.embed_dim)
         self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
