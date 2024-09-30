@@ -93,7 +93,7 @@ class Encoder(nn.Module):
         self.up_3 = ConvModule(96, 128)
 
     def forward(self, img_1, img_2):
-        inputs = torch.cat([x, y], dim=1)
+        inputs = torch.cat([img_1, img_2], dim=1)
         guided_feature = self.cats(inputs)
 
         features_1 = self.encoder(img_1)
