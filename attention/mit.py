@@ -120,20 +120,20 @@ mit_settings = {
 
 
 class CrossMiT(nn.Module):
-    def __init__(self, embed_dim):
+    def __init__(self, c1, c2):
         super().__init__()
         drop_path_rate = 0.1
         depths = [1]
         # patch_embed
-        self.patch_embed = PatchEmbed(embed_dim, embed_dim, 3, 2)
+        self.patch_embed = PatchEmbed(c1, c2, 3, 2)
 
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]
 
         cur = 0
         self.block1 = nn.ModuleList(
-            [Block(embed_dim, 8, 1, dpr[cur + i]) for i in range(depths[0])]
+            [Block(c2, 8, 1, dpr[cur + i]) for i in range(depths[0])]
         )
-        self.norm1 = nn.LayerNorm(embed_dim)
+        self.norm1 = nn.LayerNorm(c2)
 
     def forward(self, x, y):
         B = x.shape[0]

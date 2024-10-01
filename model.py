@@ -48,8 +48,8 @@ class FusionConnection(nn.Module):
         #     p=(1 * d[2] + 1, 1 * d[2] + 1),
         #     d=(d[2] + 1, d[2] + 1),
         # )
-        self.cross_mit1 = CrossMiT(c1)
-        self.cross_mit2 = CrossMiT(c2)
+        self.cross_mit1 = CrossMiT(c1, c2)
+        self.cross_mit2 = CrossMiT(c1, c2)
         
         self.conv = ConvModule(2 * c2, c2)
 
@@ -94,9 +94,9 @@ class Encoder(nn.Module):
         self.cats = ResBlock(2, 32, 1)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
-        self.up_1 = ConvModule(32, 64)
-        self.up_2 = ConvModule(64, 96)
-        self.up_3 = ConvModule(96, 128)
+        self.up_1 = ConvModule(32, 64, 1)
+        self.up_2 = ConvModule(64, 160, 1)
+        self.up_3 = ConvModule(160, 256, 1)
 
     def forward(self, img_1, img_2):
         inputs = torch.cat([img_1, img_2], dim=1)
@@ -109,16 +109,17 @@ class Encoder(nn.Module):
         y1, y2, y3, y4 = features_2
 
         skip_mod_1 = self.skip_1(x1, y1, guided_feature)
-        _skip_mod_1 = self.maxpool(skip_mod_1)
-        _skip_mod_1 = self.up_1(_skip_mod_1)
+        # _skip_mod_1 = self.maxpool(skip_mod_1)
+        _skip_mod_1 = self.up_1(skip_mod_1)
+        # print(_skip_mod_1.shape, x2.shape)
 
         skip_mod_2 = self.skip_2(x2, y2, _skip_mod_1)
-        _skip_mod_2 = self.maxpool(skip_mod_2)
-        _skip_mod_2 = self.up_2(_skip_mod_2)
+        # _skip_mod_2 = self.maxpool(skip_mod_2)
+        _skip_mod_2 = self.up_2(skip_mod_2)
 
         skip_mod_3 = self.skip_3(x3, y3, _skip_mod_2)
-        _skip_mod_3 = self.maxpool(skip_mod_3)
-        _skip_mod_3 = self.up_3(_skip_mod_3)
+        # _skip_mod_3 = self.maxpool(skip_mod_3)
+        _skip_mod_3 = self.up_3(skip_mod_3)
 
         skip_mod_4 = self.skip_4(x4, y4, _skip_mod_3)
 
@@ -137,9 +138,9 @@ class MLP(nn.Module):
 
 
 class ConvModule(nn.Module):
-    def __init__(self, c1, c2):
+    def __init__(self, c1, c2, k=1):
         super().__init__()
-        self.conv = nn.Conv2d(c1, c2, 1, bias=False)
+        self.conv = nn.Conv2d(c1, c2, k, bias=False)
         self.bn = nn.BatchNorm2d(c2)  # use SyncBN in original
         self.activate = nn.ReLU(True)
 
@@ -155,7 +156,7 @@ class FusionModel(nn.Module):
         self.embed_dim = 64
         self.dim = 32
 
-        self.linear_fuse = ConvModule(sum([32, 64, 96, 128]), self.embed_dim)
+        self.linear_fuse = ConvModule(sum([32, 64, 160, 256]), self.embed_dim, 1)
         self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
         self.dropout = nn.Dropout2d(0.1)
         self.sigmoid = nn.Sigmoid()
