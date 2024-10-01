@@ -158,15 +158,24 @@ if __name__ == "__main__":
                     # ---- forward ----
                     out = model(img_1, img_2)
 
-                    _CharbonnierLoss_IR = weight[0] * criterion_CharbonnierLoss_IR(
+                    # _CharbonnierLoss_IR = weight[0] * criterion_CharbonnierLoss_IR(
+                    #     out, img_1
+                    # )
+                    # _CharbonnierLoss_VI = weight[1] * criterion_CharbonnierLoss_VI(
+                    #     out, img_2
+                    # )
+                    # loss_tv_ir = weight[2] * criterion_tv_ir(out, img_1)
+                    # loss_tv_vi = weight[3] * criterion_tv_vi(out, img_2)
+                    # loss_ssim = criterion_ssim(out, img_1, img_2)
+                    # loss = _CharbonnierLoss_IR + _CharbonnierLoss_VI + loss_ssim
+                    _CharbonnierLoss_IR = criterion_CharbonnierLoss_IR(
                         out, img_1
                     )
-                    _CharbonnierLoss_VI = weight[1] * criterion_CharbonnierLoss_VI(
+                    _CharbonnierLoss_VI = criterion_CharbonnierLoss_VI(
                         out, img_2
                     )
-                    loss_tv_ir = weight[2] * criterion_tv_ir(out, img_1)
-                    loss_tv_vi = weight[3] * criterion_tv_vi(out, img_2)
                     loss_ssim = criterion_ssim(out, img_1, img_2)
+                    
                     loss = _CharbonnierLoss_IR + _CharbonnierLoss_VI + loss_ssim
 
                     loss.backward()
@@ -177,13 +186,12 @@ if __name__ == "__main__":
                     loss_record.update(loss.data, args.batchsize)
                     loss_1_record.update(_CharbonnierLoss_IR.data, args.batchsize)
                     loss_2_record.update(_CharbonnierLoss_VI.data, args.batchsize)
-                    loss_3_record.update(loss_tv_ir.data, args.batchsize)
-                    loss_4_record.update(loss_tv_vi.data, args.batchsize)
+                    loss_3_record.update(loss_ssim.data, args.batchsize)
 
                 # ---- train visualization ----
                 print(
                     "{} Training Epoch [{:03d}/{:03d}], "
-                    "[loss: {:0.4f}, loss_1 L1: {:0.4f}, loss_2 L2: {:0.4f}, loss_1 SSIM: {:0.4f}, loss_2 SSIM: {:0.4f}]".format(
+                    "[loss: {:0.4f}, CharbonnierLoss_IR: {:0.4f}, CharbonnierLoss_VI: {:0.4f}, SSIM: {:0.4f}]".format(
                         datetime.now(),
                         epoch,
                         args.num_epochs,
@@ -191,7 +199,6 @@ if __name__ == "__main__":
                         loss_1_record.show(),
                         loss_2_record.show(),
                         loss_3_record.show(),
-                        loss_4_record.show(),
                     )
                 )
 

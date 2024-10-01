@@ -3,7 +3,7 @@ from torch import nn
 import torch
 from torch.nn import functional as F
 from backbone.residual_cbam import Residual_CBAM_Block, ResBlock
-
+from attention.mit import CrossMiT
 
 class DilationConvModule(nn.Module):
     def __init__(self, c1, c2, k, s=1, p=0, d=1, g=1):
@@ -23,32 +23,34 @@ class FusionConnection(nn.Module):
     def __init__(self, c1, c2, scales=(1, 2, 3)) -> None:
         super().__init__()
 
-        d = scales
-        self.d_1 = DilationConvModule(
-            c1,
-            c2,
-            (3, 3),
-            1,
-            p=(1 * d[0] + 1, 1 * d[0] + 1),
-            d=(d[0] + 1, d[0] + 1),
-        )
-        self.d_2 = DilationConvModule(
-            c1,
-            c2,
-            (3, 3),
-            1,
-            p=(1 * d[1] + 1, 1 * d[1] + 1),
-            d=(d[1] + 1, d[1] + 1),
-        )
-        self.d_3 = DilationConvModule(
-            c1,
-            c2,
-            (3, 3),
-            1,
-            p=(1 * d[2] + 1, 1 * d[2] + 1),
-            d=(d[2] + 1, d[2] + 1),
-        )
-
+        # d = scales
+        # self.d_1 = DilationConvModule(
+        #     c1,
+        #     c2,
+        #     (3, 3),
+        #     1,
+        #     p=(1 * d[0] + 1, 1 * d[0] + 1),
+        #     d=(d[0] + 1, d[0] + 1),
+        # )
+        # self.d_2 = DilationConvModule(
+        #     c1,
+        #     c2,
+        #     (3, 3),
+        #     1,
+        #     p=(1 * d[1] + 1, 1 * d[1] + 1),
+        #     d=(d[1] + 1, d[1] + 1),
+        # )
+        # self.d_3 = DilationConvModule(
+        #     c1,
+        #     c2,
+        #     (3, 3),
+        #     1,
+        #     p=(1 * d[2] + 1, 1 * d[2] + 1),
+        #     d=(d[2] + 1, d[2] + 1),
+        # )
+        self.cross_mit1 = CrossMiT(c1)
+        self.cross_mit2 = CrossMiT(c2)
+        
         self.conv = ConvModule(2 * c2, c2)
 
     def forward(self, x1, x2, guided=None):
@@ -56,20 +58,24 @@ class FusionConnection(nn.Module):
             x1 = x1 + guided
             x2 = x2 + guided
 
-        x1_d_1 = self.d_1(x1)
-        x1_d_2 = self.d_2(x1)
-        x1_d_3 = self.d_3(x1)
+        # x1_d_1 = self.d_1(x1)
+        # x1_d_2 = self.d_2(x1)
+        # x1_d_3 = self.d_3(x1)
 
-        x2_d_1 = self.d_1(x2)
-        x2_d_2 = self.d_2(x2)
-        x2_d_3 = self.d_3(x2)
+        # x2_d_1 = self.d_1(x2)
+        # x2_d_2 = self.d_2(x2)
+        # x2_d_3 = self.d_3(x2)
 
-        xd_1 = torch.cat([x1_d_1, x2_d_1], dim=1)
-        xd_3 = torch.cat([x1_d_2, x2_d_2], dim=1)
-        xd_5 = torch.cat([x1_d_3, x2_d_3], dim=1)
+        # xd_1 = torch.cat([x1_d_1, x2_d_1], dim=1)
+        # xd_3 = torch.cat([x1_d_2, x2_d_2], dim=1)
+        # xd_5 = torch.cat([x1_d_3, x2_d_3], dim=1)
 
-        out = xd_1 + xd_3 + xd_5
+        # out = xd_1 + xd_3 + xd_5
         # out = torch.cat([xd_1, xd_3, xd_5], dim=1)
+        functional_att = self.cross_mit1(x1, x2)
+        anatomical_att = self.cross_mit2(x2, x1)
+        out = torch.cat([functional_att, anatomical_att], dim=1)
+        
         out = self.conv(out)
 
         return out
@@ -82,8 +88,8 @@ class Encoder(nn.Module):
         self.encoder = Residual_CBAM_Block(in_channels=1)
         self.skip_1 = FusionConnection(32, 32)
         self.skip_2 = FusionConnection(64, 64)
-        self.skip_3 = FusionConnection(96, 96)
-        self.skip_4 = FusionConnection(128, 128)
+        self.skip_3 = FusionConnection(160, 160)
+        self.skip_4 = FusionConnection(256, 256)
 
         self.cats = ResBlock(2, 32, 1)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)

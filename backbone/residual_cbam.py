@@ -38,7 +38,7 @@ class ResBlock(nn.Module):
 
 
 class Residual_CBAM_Block(nn.Module):
-    def __init__(self, in_channels=1, channels=[32, 64, 96, 128]):
+    def __init__(self, in_channels=1, channels=[32, 64, 160, 256]):
         super(Residual_CBAM_Block, self).__init__()
 
         self.res_1 = ResBlock(in_channels, channels[0], stride=1)
