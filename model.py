@@ -99,6 +99,8 @@ class Encoder(nn.Module):
         self.up_3 = ConvModule(160, 256, 1)
 
     def forward(self, img_1, img_2):
+        img_1 = self.maxpool(img_1)
+        img_2 = self.maxpool(img_2)
         inputs = torch.cat([img_1, img_2], dim=1)
         guided_feature = self.cats(inputs)
 
