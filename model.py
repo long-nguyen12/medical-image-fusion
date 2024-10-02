@@ -54,9 +54,9 @@ class FusionConnection(nn.Module):
         self.conv = ConvModule(2 * c2, c2)
 
     def forward(self, x1, x2, guided=None):
-        if guided is not None:
-            x1 = x1 + guided
-            x2 = x2 + guided
+        # if guided is not None:
+        #     x1 = x1 + guided
+        #     x2 = x2 + guided
 
         # x1_d_1 = self.d_1(x1)
         # x1_d_2 = self.d_2(x1)

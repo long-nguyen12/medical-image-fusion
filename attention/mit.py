@@ -104,7 +104,7 @@ class Block(nn.Module):
         self.mlp = MLP(dim, int(dim * 4))
 
     def forward(self, x, y, H, W) -> Tensor:
-        x = x + self.drop_path(self.attn(self.norm1(x), y, H, W))
+        x = x + self.drop_path(self.attn(self.norm1(x), self.norm1(y), H, W))
         x = x + self.drop_path(self.mlp(self.norm2(x), H, W))
         return x
 
