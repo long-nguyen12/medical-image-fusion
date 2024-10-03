@@ -48,6 +48,7 @@ class FusionConnection(nn.Module):
         #     p=(1 * d[2] + 1, 1 * d[2] + 1),
         #     d=(d[2] + 1, d[2] + 1),
         # )
+        self.cbam = CBAM(c1)
         self.cross_mit1 = CrossMiT(c1, c2)
         self.cross_mit2 = CrossMiT(c1, c2)
         
@@ -72,6 +73,10 @@ class FusionConnection(nn.Module):
 
         # out = xd_1 + xd_3 + xd_5
         # out = torch.cat([xd_1, xd_3, xd_5], dim=1)
+        
+        x1 = self.cbam(x1)
+        x2 = self.cbam(x2)
+        
         functional_att = self.cross_mit1(x1, x2)
         anatomical_att = self.cross_mit2(x2, x1)
         out = torch.cat([functional_att, anatomical_att], dim=1)
