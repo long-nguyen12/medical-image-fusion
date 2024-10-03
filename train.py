@@ -58,7 +58,7 @@ class Dataset(torch.utils.data.Dataset):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--num_epochs", type=int, default=300, help="epoch number")
+    parser.add_argument("--num_epochs", type=int, default=100, help="epoch number")
     parser.add_argument("--init_lr", type=float, default=1e-4, help="learning rate")
     parser.add_argument("--batchsize", type=int, default=4, help="training batch size")
     parser.add_argument(
