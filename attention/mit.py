@@ -32,9 +32,9 @@ class Attention(nn.Module):
             self.sr = nn.Conv2d(dim, dim, sr_ratio, sr_ratio)
             self.norm = nn.LayerNorm(dim)
 
-    def forward(self, x, y, H, W) -> Tensor:
+    def forward(self, x, H, W) -> Tensor:
         B, N, C = x.shape
-        q = self.q(y).reshape(B, N, self.head, C // self.head).permute(0, 2, 1, 3)
+        q = self.q(x).reshape(B, N, self.head, C // self.head).permute(0, 2, 1, 3)
 
         if self.sr_ratio > 1:
             x = x.permute(0, 2, 1).reshape(B, C, H, W)
@@ -103,8 +103,8 @@ class Block(nn.Module):
         self.norm2 = nn.LayerNorm(dim)
         self.mlp = MLP(dim, int(dim * 4))
 
-    def forward(self, x, y, H, W) -> Tensor:
-        x = x + self.drop_path(self.attn(self.norm1(x), self.norm1(y), H, W))
+    def forward(self, x, H, W) -> Tensor:
+        x = x + self.drop_path(self.attn(self.norm1(x), H, W))
         x = x + self.drop_path(self.mlp(self.norm2(x), H, W))
         return x
 
@@ -119,7 +119,7 @@ mit_settings = {
 }
 
 
-class CrossMiT(nn.Module):
+class MiT(nn.Module):
     def __init__(self, c1, c2):
         super().__init__()
         drop_path_rate = 0.1
@@ -129,20 +129,44 @@ class CrossMiT(nn.Module):
 
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]
 
+        # self.block_mit = Block(c2, 8, 1, dpr[0])
+
         cur = 0
-        self.block1 = nn.ModuleList(
+        self.block_mit = nn.ModuleList(
             [Block(c2, 8, 1, dpr[cur + i]) for i in range(depths[0])]
         )
         self.norm1 = nn.LayerNorm(c2)
 
-    def forward(self, x, y):
+    def forward(self, x):
         B = x.shape[0]
-
         x, H, W = self.patch_embed(x)
-        y, _, _ = self.patch_embed(y)
+        for blk in self.block_mit:
+            x = blk(x, H, W)
+        # x = self.block_mit(x, H, W)
+        # out = self.norm1(x)
+        out = self.norm1(x).reshape(B, H, W, -1).permute(0, 3, 1, 2)
 
-        for blk in self.block1:
-            x = blk(x, y, H, W)
+        return out
+
+
+class CrossMiT(nn.Module):
+    def __init__(self, c1, c2):
+        super().__init__()
+        drop_path_rate = 0.1
+        depths = [1]
+        self.patch_embed = PatchEmbed(c1, c2, 3, 2)
+
+        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]
+
+        self.block_mit = Block(c2, 8, 1, dpr[0])
+        self.block_cross_mit = Block(c2, 8, 1, dpr[0])
+        self.norm1 = nn.LayerNorm(c2)
+
+    def forward(self, x, y):
+        B, H, W = x.shape
+        x, H, W = self.patch_embed(x)
+        y, H, W = self.patch_embed(y)
+        x = self.block_mit(x, y, H, W)
         out = self.norm1(x).reshape(B, H, W, -1).permute(0, 3, 1, 2)
 
         return out

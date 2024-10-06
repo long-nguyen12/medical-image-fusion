@@ -2,86 +2,36 @@ from attention.modules import CBAM
 from torch import nn
 import torch
 from torch.nn import functional as F
-from backbone.residual_cbam import Residual_CBAM_Block, ResBlock
-from attention.mit import CrossMiT
-
-class DilationConvModule(nn.Module):
-    def __init__(self, c1, c2, k, s=1, p=0, d=1, g=1):
-        super().__init__()
-        self.conv = nn.Conv2d(c1, c2, k, s, p, d, g, bias=False)
-        self.bn = nn.BatchNorm2d(c2)
-        self.act = nn.ReLU(True)
-
-    def forward(self, x):
-        x = self.conv(x)
-        x = self.bn(x)
-        x = self.act(x)
-        return x
+from backbone.residual_cbam import Residual_Convs, ResBlock
+from attention.mit import CrossMiT, MiT
 
 
 class FusionConnection(nn.Module):
     def __init__(self, c1, c2, scales=(1, 2, 3)) -> None:
         super().__init__()
 
-        # d = scales
-        # self.d_1 = DilationConvModule(
-        #     c1,
-        #     c2,
-        #     (3, 3),
-        #     1,
-        #     p=(1 * d[0] + 1, 1 * d[0] + 1),
-        #     d=(d[0] + 1, d[0] + 1),
-        # )
-        # self.d_2 = DilationConvModule(
-        #     c1,
-        #     c2,
-        #     (3, 3),
-        #     1,
-        #     p=(1 * d[1] + 1, 1 * d[1] + 1),
-        #     d=(d[1] + 1, d[1] + 1),
-        # )
-        # self.d_3 = DilationConvModule(
-        #     c1,
-        #     c2,
-        #     (3, 3),
-        #     1,
-        #     p=(1 * d[2] + 1, 1 * d[2] + 1),
-        #     d=(d[2] + 1, d[2] + 1),
-        # )
-        self.cbam = CBAM(c1)
+        self.cbam_1 = CBAM(c1)
+        self.cbam_2 = CBAM(c1)
+        self.mit = MiT(c1, c2)
+        self.mit2 = MiT(c1, c2)
         self.cross_mit1 = CrossMiT(c1, c2)
         self.cross_mit2 = CrossMiT(c1, c2)
-        
+
         self.conv = ConvModule(2 * c2, c2)
 
-    def forward(self, x1, x2, guided=None):
-        # if guided is not None:
-        #     x1 = x1 + guided
-        #     x2 = x2 + guided
+    def forward(self, x1, x2):
 
-        # x1_d_1 = self.d_1(x1)
-        # x1_d_2 = self.d_2(x1)
-        # x1_d_3 = self.d_3(x1)
+        x1 = self.cbam_1(x1)
+        x2 = self.cbam_2(x2)
 
-        # x2_d_1 = self.d_1(x2)
-        # x2_d_2 = self.d_2(x2)
-        # x2_d_3 = self.d_3(x2)
+        x = x1 + x2
+        out = self.mit(x)
 
-        # xd_1 = torch.cat([x1_d_1, x2_d_1], dim=1)
-        # xd_3 = torch.cat([x1_d_2, x2_d_2], dim=1)
-        # xd_5 = torch.cat([x1_d_3, x2_d_3], dim=1)
-
-        # out = xd_1 + xd_3 + xd_5
-        # out = torch.cat([xd_1, xd_3, xd_5], dim=1)
-        
-        x1 = self.cbam(x1)
-        x2 = self.cbam(x2)
-        
-        functional_att = self.cross_mit1(x1, x2)
-        anatomical_att = self.cross_mit2(x2, x1)
-        out = torch.cat([functional_att, anatomical_att], dim=1)
-        
-        out = self.conv(out)
+        # functional_att = self.cross_mit1(x1, x2)
+        # anatomical_att = self.cross_mit2(x2, x1)
+        # out = torch.cat([functional_att, anatomical_att], dim=1)
+        # out = functional_att + anatomical_att
+        # out = self.conv(out)
 
         return out
 
@@ -90,13 +40,12 @@ class Encoder(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-        self.encoder = Residual_CBAM_Block(in_channels=1)
+        self.encoder = Residual_Convs(in_channels=1)
         self.skip_1 = FusionConnection(32, 32)
         self.skip_2 = FusionConnection(64, 64)
         self.skip_3 = FusionConnection(160, 160)
         self.skip_4 = FusionConnection(256, 256)
 
-        self.cats = ResBlock(2, 32, 1)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
         self.up_1 = ConvModule(32, 64, 1)
@@ -106,8 +55,6 @@ class Encoder(nn.Module):
     def forward(self, img_1, img_2):
         img_1 = self.maxpool(img_1)
         img_2 = self.maxpool(img_2)
-        inputs = torch.cat([img_1, img_2], dim=1)
-        guided_feature = self.cats(inputs)
 
         features_1 = self.encoder(img_1)
         features_2 = self.encoder(img_2)
@@ -115,20 +62,13 @@ class Encoder(nn.Module):
         x1, x2, x3, x4 = features_1
         y1, y2, y3, y4 = features_2
 
-        skip_mod_1 = self.skip_1(x1, y1, guided_feature)
-        # _skip_mod_1 = self.maxpool(skip_mod_1)
-        _skip_mod_1 = self.up_1(skip_mod_1)
-        # print(_skip_mod_1.shape, x2.shape)
+        skip_mod_1 = self.skip_1(x1, y1)
 
-        skip_mod_2 = self.skip_2(x2, y2, _skip_mod_1)
-        # _skip_mod_2 = self.maxpool(skip_mod_2)
-        _skip_mod_2 = self.up_2(skip_mod_2)
+        skip_mod_2 = self.skip_2(x2, y2)
 
-        skip_mod_3 = self.skip_3(x3, y3, _skip_mod_2)
-        # _skip_mod_3 = self.maxpool(skip_mod_3)
-        _skip_mod_3 = self.up_3(skip_mod_3)
+        skip_mod_3 = self.skip_3(x3, y3)
 
-        skip_mod_4 = self.skip_4(x4, y4, _skip_mod_3)
+        skip_mod_4 = self.skip_4(x4, y4)
 
         return skip_mod_1, skip_mod_2, skip_mod_3, skip_mod_4
 
