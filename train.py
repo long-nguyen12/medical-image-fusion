@@ -237,13 +237,13 @@ if __name__ == "__main__":
                     )
                 )
                 
-            torch.cuda.empty_cache()
-            res = eval(model, test_loader, device)
-            if res > best_ssim:
-                best_ssim = res
-                ckpt_path = save_path + "best.pth"
-                print("[Saving Checkpoint:]", ckpt_path)
-                torch.save(model.state_dict(), ckpt_path)
+            # torch.cuda.empty_cache()
+            # res = eval(model, test_loader, device)
+            # if res > best_ssim:
+            #     best_ssim = res
+            #     ckpt_path = save_path + "best.pth"
+            #     print("[Saving Checkpoint:]", ckpt_path)
+            #     torch.save(model.state_dict(), ckpt_path)
 
         ckpt_path = save_path + "last.pth"
         print("[Saving Checkpoint:]", ckpt_path)
