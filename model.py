@@ -110,10 +110,10 @@ class FusionModel(nn.Module):
         #     )
         # out = self.linear_fuse(torch.cat(outs[::-1], dim=1))
         # out = self.linear_pred(self.dropout(out))
-        # out = self.sigmoid(out)
-        # out = F.interpolate(
-        #     out, size=x.size()[2:], mode="bilinear", align_corners=False
-        # )
+        out = self.sigmoid(out)
+        out = F.interpolate(
+            out, size=x.size()[2:], mode="bicubic", align_corners=True
+        )
 
         return out
 
