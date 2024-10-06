@@ -56,7 +56,7 @@ class Dataset(torch.utils.data.Dataset):
             return np.asarray(img1_Y), np.asarray(img2), np.asarray(img1_CrCb)
 
 
-def eval(model, test_loader):
+def eval(model, test_loader, device):
     model.eval()
 
     src_1 = []
@@ -219,6 +219,9 @@ if __name__ == "__main__":
                     loss_1_record.update(_CharbonnierLoss_IR.data, args.batchsize)
                     loss_2_record.update(_CharbonnierLoss_VI.data, args.batchsize)
                     loss_3_record.update(loss_ssim.data, args.batchsize)
+                
+                torch.cuda.synchronize()
+
 
                 # ---- train visualization ----
                 print(
@@ -233,8 +236,9 @@ if __name__ == "__main__":
                         loss_3_record.show(),
                     )
                 )
-
-            res = eval(model, test_loader)
+                
+            torch.cuda.empty_cache()
+            res = eval(model, test_loader, device)
             if res > best_ssim:
                 best_ssim = res
                 ckpt_path = save_path + "best.pth"
