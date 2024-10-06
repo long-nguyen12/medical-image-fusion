@@ -106,6 +106,7 @@ def get_scores(src_1, src_2, prs):
         en_val = en(pr)
         ens.append(en_val)
 
+    _ssims = sum(ssims) / len(ssims)
     print("psnrs")
     print(sum(psnrs) / len(psnrs))
     print("ssims")
@@ -118,6 +119,8 @@ def get_scores(src_1, src_2, prs):
     print(sum(fsims) / len(fsims))
     print("entropy")
     print(sum(ens) / len(ens))
+
+    return _ssims
 
 
 if __name__ == "__main__":
@@ -176,7 +179,7 @@ if __name__ == "__main__":
             dataset, batch_size=1, shuffle=False, pin_memory=True, drop_last=True
         )
 
-        saved_model = f"snapshots/ours/{_ds}/last.pth"
+        saved_model = f"snapshots/ours/{_ds}/best.pth"
         model = FusionModel().to(device)
         state_dict = torch.load(saved_model, map_location="cpu")
         model.load_state_dict(state_dict, strict=True)

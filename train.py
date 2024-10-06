@@ -12,8 +12,8 @@ from torchvision import transforms
 
 # from val import inference
 from model import FusionModel
-import pytorch_msssim
 from losses import CharbonnierLoss_IR, CharbonnierLoss_VI, tv_vi, tv_ir, ssim_loss
+from test import get_scores
 
 
 class Dataset(torch.utils.data.Dataset):
@@ -56,6 +56,32 @@ class Dataset(torch.utils.data.Dataset):
             return np.asarray(img1_Y), np.asarray(img2), np.asarray(img1_CrCb)
 
 
+def eval(model, test_loader):
+    model.eval()
+
+    src_1 = []
+    src_2 = []
+    src_3 = []
+    prs = []
+    for i, pack in enumerate(test_loader, start=1):
+        img_1, img_2, img_3 = pack
+        img_1 = img_1.to(device)
+        img_2 = img_2.to(device)
+
+        res = model(img_1, img_2)
+        prs.append(res)
+
+        res = res.data.cpu().numpy().squeeze()
+        res = (res - res.min()) / (res.max() - res.min() + 1e-8) * 255
+
+        src_1.append(img_1)
+        src_2.append(img_2)
+        src_3.append(img_3)
+
+    ssim = get_scores(src_1, src_2, prs)
+    return ssim
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--num_epochs", type=int, default=100, help="epoch number")
@@ -91,8 +117,6 @@ if __name__ == "__main__":
 
         dataset_path = _ds.split("-")
 
-        train_img_paths = []
-        train_mask_paths = []
         train_img_paths = glob(
             "{}/{}/train/{}/*".format(args.train_path, _ds, dataset_path[0])
         )
@@ -121,6 +145,27 @@ if __name__ == "__main__":
             drop_last=True,
         )
 
+        test_img_paths = glob(
+            "{}/{}/train/{}/*".format(args.train_path, _ds, dataset_path[0])
+        )
+        test_mask_paths = glob(
+            "{}/{}/train/{}/*".format(args.train_path, _ds, dataset_path[1])
+        )
+        test_img_paths.sort()
+        test_mask_paths.sort()
+
+        test_dataset = Dataset(
+            test_img_paths, test_mask_paths, transform=transform, type=dataset_path[0]
+        )
+
+        test_loader = torch.utils.data.DataLoader(
+            test_dataset,
+            batch_size=1,
+            shuffle=False,
+            pin_memory=True,
+            drop_last=True,
+        )
+
         model = FusionModel().to(device)
 
         # ---- flops and params ----
@@ -128,6 +173,7 @@ if __name__ == "__main__":
         optimizer = torch.optim.Adam(params, args.init_lr)
 
         start_epoch = 1
+        best_ssim = 0
 
         best_result = 0
         loss_record = AvgMeter()
@@ -158,24 +204,10 @@ if __name__ == "__main__":
                     # ---- forward ----
                     out = model(img_1, img_2)
 
-                    # _CharbonnierLoss_IR = weight[0] * criterion_CharbonnierLoss_IR(
-                    #     out, img_1
-                    # )
-                    # _CharbonnierLoss_VI = weight[1] * criterion_CharbonnierLoss_VI(
-                    #     out, img_2
-                    # )
-                    # loss_tv_ir = weight[2] * criterion_tv_ir(out, img_1)
-                    # loss_tv_vi = weight[3] * criterion_tv_vi(out, img_2)
-                    # loss_ssim = criterion_ssim(out, img_1, img_2)
-                    # loss = _CharbonnierLoss_IR + _CharbonnierLoss_VI + loss_ssim
-                    _CharbonnierLoss_IR = criterion_CharbonnierLoss_IR(
-                        out, img_1
-                    )
-                    _CharbonnierLoss_VI = criterion_CharbonnierLoss_VI(
-                        out, img_2
-                    )
+                    _CharbonnierLoss_IR = criterion_CharbonnierLoss_IR(out, img_1)
+                    _CharbonnierLoss_VI = criterion_CharbonnierLoss_VI(out, img_2)
                     loss_ssim = criterion_ssim(out, img_1, img_2)
-                    
+
                     loss = _CharbonnierLoss_IR + _CharbonnierLoss_VI + loss_ssim
 
                     loss.backward()
@@ -201,6 +233,13 @@ if __name__ == "__main__":
                         loss_3_record.show(),
                     )
                 )
+
+            res = eval(model, test_loader)
+            if res > best_ssim:
+                best_ssim = res
+                ckpt_path = save_path + "best.pth"
+                print("[Saving Checkpoint:]", ckpt_path)
+                torch.save(model.state_dict(), ckpt_path)
 
         ckpt_path = save_path + "last.pth"
         print("[Saving Checkpoint:]", ckpt_path)

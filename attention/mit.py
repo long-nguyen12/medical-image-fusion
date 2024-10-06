@@ -129,8 +129,6 @@ class MiT(nn.Module):
 
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]
 
-        # self.block_mit = Block(c2, 8, 1, dpr[0])
-
         cur = 0
         self.block_mit = nn.ModuleList(
             [Block(c2, 8, 1, dpr[cur + i]) for i in range(depths[0])]
@@ -142,38 +140,14 @@ class MiT(nn.Module):
         x, H, W = self.patch_embed(x)
         for blk in self.block_mit:
             x = blk(x, H, W)
-        # x = self.block_mit(x, H, W)
-        # out = self.norm1(x)
-        out = self.norm1(x).reshape(B, H, W, -1).permute(0, 3, 1, 2)
 
-        return out
-
-
-class CrossMiT(nn.Module):
-    def __init__(self, c1, c2):
-        super().__init__()
-        drop_path_rate = 0.1
-        depths = [1]
-        self.patch_embed = PatchEmbed(c1, c2, 3, 2)
-
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]
-
-        self.block_mit = Block(c2, 8, 1, dpr[0])
-        self.block_cross_mit = Block(c2, 8, 1, dpr[0])
-        self.norm1 = nn.LayerNorm(c2)
-
-    def forward(self, x, y):
-        B, H, W = x.shape
-        x, H, W = self.patch_embed(x)
-        y, H, W = self.patch_embed(y)
-        x = self.block_mit(x, y, H, W)
         out = self.norm1(x).reshape(B, H, W, -1).permute(0, 3, 1, 2)
 
         return out
 
 
 if __name__ == "__main__":
-    model = CrossMiT(32)
+    model = MiT(32, 32)
     x = torch.zeros(1, 32, 128, 128)
     outs = model(x, x)
     print(outs.shape)

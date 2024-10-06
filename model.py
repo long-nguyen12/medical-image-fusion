@@ -3,7 +3,8 @@ from torch import nn
 import torch
 from torch.nn import functional as F
 from backbone.residual_cbam import Residual_Convs, ResBlock
-from attention.mit import CrossMiT, MiT
+from attention.mit import MiT
+from head.fpn import FPNHead
 
 
 class FusionConnection(nn.Module):
@@ -14,8 +15,6 @@ class FusionConnection(nn.Module):
         self.cbam_2 = CBAM(c1)
         self.mit = MiT(c1, c2)
         self.mit2 = MiT(c1, c2)
-        self.cross_mit1 = CrossMiT(c1, c2)
-        self.cross_mit2 = CrossMiT(c1, c2)
 
         self.conv = ConvModule(2 * c2, c2)
 
@@ -26,12 +25,7 @@ class FusionConnection(nn.Module):
 
         x = x1 + x2
         out = self.mit(x)
-
-        # functional_att = self.cross_mit1(x1, x2)
-        # anatomical_att = self.cross_mit2(x2, x1)
-        # out = torch.cat([functional_att, anatomical_att], dim=1)
-        # out = functional_att + anatomical_att
-        # out = self.conv(out)
+        # print(out.shape, x1.shape, x2.shape)
 
         return out
 
@@ -48,9 +42,6 @@ class Encoder(nn.Module):
 
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
-        self.up_1 = ConvModule(32, 64, 1)
-        self.up_2 = ConvModule(64, 160, 1)
-        self.up_3 = ConvModule(160, 256, 1)
 
     def forward(self, img_1, img_2):
         img_1 = self.maxpool(img_1)
@@ -63,11 +54,8 @@ class Encoder(nn.Module):
         y1, y2, y3, y4 = features_2
 
         skip_mod_1 = self.skip_1(x1, y1)
-
         skip_mod_2 = self.skip_2(x2, y2)
-
         skip_mod_3 = self.skip_3(x3, y3)
-
         skip_mod_4 = self.skip_4(x4, y4)
 
         return skip_mod_1, skip_mod_2, skip_mod_3, skip_mod_4
@@ -99,32 +87,33 @@ class FusionModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.encoder = Encoder()
-        # self.decoder = Decoder()
+        self.decoder = FPNHead([32, 64, 160, 256])
         self.embed_dim = 64
         self.dim = 32
 
-        self.linear_fuse = ConvModule(sum([32, 64, 160, 256]), self.embed_dim, 1)
-        self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
-        self.dropout = nn.Dropout2d(0.1)
-        self.sigmoid = nn.Sigmoid()
+        # self.linear_fuse = ConvModule(sum([32, 64, 160, 256]), self.embed_dim, 1)
+        # self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
+        # self.dropout = nn.Dropout2d(0.1)
+        # self.sigmoid = nn.Sigmoid()
 
     def forward(self, x, y):
         features = self.encoder(x, y)
+        out = self.decoder(features)
         # out = self.decoder(features)
         # return out
-        B, _, H, W = features[0].shape
-        outs = []
+        # B, _, H, W = features[0].shape
+        # outs = []
 
-        for i, cf in enumerate(features):
-            outs.append(
-                F.interpolate(cf, size=(H, W), mode="bilinear", align_corners=False)
-            )
-        out = self.linear_fuse(torch.cat(outs[::-1], dim=1))
-        out = self.linear_pred(self.dropout(out))
-        out = self.sigmoid(out)
-        out = F.interpolate(
-            out, size=x.size()[2:], mode="bilinear", align_corners=False
-        )
+        # for i, cf in enumerate(features):
+        #     outs.append(
+        #         F.interpolate(cf, size=(H, W), mode="bilinear", align_corners=False)
+        #     )
+        # out = self.linear_fuse(torch.cat(outs[::-1], dim=1))
+        # out = self.linear_pred(self.dropout(out))
+        # out = self.sigmoid(out)
+        # out = F.interpolate(
+        #     out, size=x.size()[2:], mode="bilinear", align_corners=False
+        # )
 
         return out
 
