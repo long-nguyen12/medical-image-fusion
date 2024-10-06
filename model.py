@@ -94,7 +94,7 @@ class FusionModel(nn.Module):
         # self.linear_fuse = ConvModule(sum([32, 64, 160, 256]), self.embed_dim, 1)
         # self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
         # self.dropout = nn.Dropout2d(0.1)
-        # self.sigmoid = nn.Sigmoid()
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x, y):
         features = self.encoder(x, y)
