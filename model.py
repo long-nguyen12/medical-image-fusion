@@ -5,7 +5,7 @@ from torch.nn import functional as F
 from backbone.residual_cbam import Residual_Convs, ResBlock
 from attention.mit import MiT
 from head.fpn import FPNHead
-from backbone.res2net import res2net50_26w_4s
+from backbone.res2net import res2net50_26w_4s, res2net50
 
 
 class ConvModule(nn.Module):
@@ -88,7 +88,7 @@ class Encoder(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-        self.encoder = res2net50_26w_4s(pretrained=True)
+        self.encoder = res2net50(pretrained=False)
         self.skip_1 = FusionConnection(256, 256)
         self.skip_2 = FusionConnection(512, 512)
         self.skip_3 = FusionConnection(1024, 1024)
