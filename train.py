@@ -170,12 +170,10 @@ if __name__ == "__main__":
 
         # ---- flops and params ----
         params = model.parameters()
-        optimizer = torch.optim.Adam(params, args.init_lr)
-
+        optimizer = torch.optim.Adam(params, args.init_lr, betas=(0.9, 0.999), eps=1e-8)
         start_epoch = 1
         best_ssim = 0
 
-        best_result = 0
         loss_record = AvgMeter()
         loss_1_record = AvgMeter()
         loss_2_record = AvgMeter()
@@ -219,9 +217,8 @@ if __name__ == "__main__":
                     loss_1_record.update(_CharbonnierLoss_IR.data, args.batchsize)
                     loss_2_record.update(_CharbonnierLoss_VI.data, args.batchsize)
                     loss_3_record.update(loss_ssim.data, args.batchsize)
-                
-                torch.cuda.synchronize()
 
+                torch.cuda.synchronize()
 
                 # ---- train visualization ----
                 print(
@@ -236,7 +233,7 @@ if __name__ == "__main__":
                         loss_3_record.show(),
                     )
                 )
-                
+
             # torch.cuda.empty_cache()
             # res = eval(model, test_loader, device)
             # if res > best_ssim:

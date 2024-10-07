@@ -5,26 +5,80 @@ from torch.nn import functional as F
 from backbone.residual_cbam import Residual_Convs, ResBlock
 from attention.mit import MiT
 from head.fpn import FPNHead
+from backbone.res2net import res2net50_26w_4s
+
+
+class ConvModule(nn.Module):
+    def __init__(self, c1, c2, k=1):
+        super().__init__()
+        self.conv = nn.Conv2d(c1, c2, k, bias=False)
+        self.bn = nn.BatchNorm2d(c2)  # use SyncBN in original
+        self.activate = nn.ReLU(True)
+
+    def forward(self, x):
+        return self.activate(self.bn(self.conv(x)))
+
+
+class ConvolutionalAttention(nn.Module):
+
+    def __init__(self, dim):
+        super(ConvolutionalAttention, self).__init__()
+        # input
+        self.conv55 = nn.Conv2d(dim, dim, 5, padding=2, groups=dim)
+
+        self.conv17_0 = nn.Conv2d(dim, dim, (1, 7), padding=(0, 3), groups=dim)
+        self.conv17_1 = nn.Conv2d(dim, dim, (7, 1), padding=(3, 0), groups=dim)
+
+        self.conv111_0 = nn.Conv2d(dim, dim, (1, 11), padding=(0, 5), groups=dim)
+        self.conv111_1 = nn.Conv2d(dim, dim, (11, 1), padding=(5, 0), groups=dim)
+
+        self.conv211_0 = nn.Conv2d(dim, dim, (1, 21), padding=(0, 10), groups=dim)
+        self.conv211_1 = nn.Conv2d(dim, dim, (21, 1), padding=(10, 0), groups=dim)
+
+        self.conv11 = nn.Conv2d(dim, dim, 1)  # channel mixer
+
+    def forward(self, x):
+
+        skip = x.clone()
+
+        c55 = self.conv55(x)
+        c17 = self.conv17_0(x)
+        c17 = self.conv17_1(c17)
+        c111 = self.conv111_0(x)
+        c111 = self.conv111_1(c111)
+        c211 = self.conv211_0(x)
+        c211 = self.conv211_1(c211)
+
+        add = c55 + c17 + c111 + c211
+
+        mixer = self.conv11(add)
+
+        op = mixer * skip
+
+        return op
 
 
 class FusionConnection(nn.Module):
-    def __init__(self, c1, c2, scales=(1, 2, 3)) -> None:
+    def __init__(self, c1, c2) -> None:
         super().__init__()
 
         self.cbam_1 = CBAM(c1)
         self.cbam_2 = CBAM(c1)
-        self.mit = MiT(c1, c2)
-        self.mit2 = MiT(c1, c2)
+        self.att_1 = ConvolutionalAttention(c1)
+        # self.att_2 = MiT(c1, c2)
 
         self.conv = ConvModule(2 * c2, c2)
 
     def forward(self, x1, x2):
-
         x1 = self.cbam_1(x1)
         x2 = self.cbam_2(x2)
 
-        x = x1 + x2
-        out = self.mit(x)
+        out = x1 + x2
+        
+        att = self.att_1(out)
+        
+        out = att + out
+        # out = self.mit(x)
         # print(out.shape, x1.shape, x2.shape)
 
         return out
@@ -34,18 +88,18 @@ class Encoder(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-        self.encoder = Residual_Convs(in_channels=1)
-        self.skip_1 = FusionConnection(32, 32)
-        self.skip_2 = FusionConnection(64, 64)
-        self.skip_3 = FusionConnection(160, 160)
-        self.skip_4 = FusionConnection(256, 256)
+        self.encoder = res2net50_26w_4s(pretrained=True)
+        self.skip_1 = FusionConnection(256, 256)
+        self.skip_2 = FusionConnection(512, 512)
+        self.skip_3 = FusionConnection(1024, 1024)
+        self.skip_4 = FusionConnection(2048, 2048)
 
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-
+        self.convs = ConvModule(1, 3, 1)
 
     def forward(self, img_1, img_2):
-        # img_1 = self.maxpool(img_1)
-        # img_2 = self.maxpool(img_2)
+        img_1 = self.convs(img_1)
+        img_2 = self.convs(img_2)
 
         features_1 = self.encoder(img_1)
         features_2 = self.encoder(img_2)
@@ -61,59 +115,21 @@ class Encoder(nn.Module):
         return skip_mod_1, skip_mod_2, skip_mod_3, skip_mod_4
 
 
-class MLP(nn.Module):
-    def __init__(self, dim, embed_dim):
-        super().__init__()
-        self.proj = nn.Linear(dim, embed_dim)
-
-    def forward(self, x):
-        x = x.flatten(2).transpose(1, 2)
-        x = self.proj(x)
-        return x
-
-
-class ConvModule(nn.Module):
-    def __init__(self, c1, c2, k=1):
-        super().__init__()
-        self.conv = nn.Conv2d(c1, c2, k, bias=False)
-        self.bn = nn.BatchNorm2d(c2)  # use SyncBN in original
-        self.activate = nn.ReLU(True)
-
-    def forward(self, x):
-        return self.activate(self.bn(self.conv(x)))
-
-
 class FusionModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.encoder = Encoder()
-        self.decoder = FPNHead([32, 64, 160, 256])
+        self.decoder = FPNHead([256, 512, 1024, 2048])
         self.embed_dim = 64
         self.dim = 32
 
-        # self.linear_fuse = ConvModule(sum([32, 64, 160, 256]), self.embed_dim, 1)
-        # self.linear_pred = nn.Conv2d(self.embed_dim, 1, 1)
-        # self.dropout = nn.Dropout2d(0.1)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x, y):
         features = self.encoder(x, y)
         out = self.decoder(features)
-        # out = self.decoder(features)
-        # return out
-        # B, _, H, W = features[0].shape
-        # outs = []
-
-        # for i, cf in enumerate(features):
-        #     outs.append(
-        #         F.interpolate(cf, size=(H, W), mode="bilinear", align_corners=False)
-        #     )
-        # out = self.linear_fuse(torch.cat(outs[::-1], dim=1))
-        # out = self.linear_pred(self.dropout(out))
         out = self.sigmoid(out)
-        out = F.interpolate(
-            out, size=x.size()[2:], mode="bicubic", align_corners=True
-        )
+        out = F.interpolate(out, size=x.size()[2:], mode="bicubic", align_corners=True)
 
         return out
 
