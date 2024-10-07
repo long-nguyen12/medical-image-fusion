@@ -149,5 +149,5 @@ class MiT(nn.Module):
 if __name__ == "__main__":
     model = MiT(32, 32)
     x = torch.zeros(1, 32, 128, 128)
-    outs = model(x, x)
+    outs = model(x)
     print(outs.shape)

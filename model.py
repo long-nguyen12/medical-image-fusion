@@ -44,8 +44,8 @@ class Encoder(nn.Module):
 
 
     def forward(self, img_1, img_2):
-        img_1 = self.maxpool(img_1)
-        img_2 = self.maxpool(img_2)
+        # img_1 = self.maxpool(img_1)
+        # img_2 = self.maxpool(img_2)
 
         features_1 = self.encoder(img_1)
         features_2 = self.encoder(img_2)
