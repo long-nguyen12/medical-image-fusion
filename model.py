@@ -8,6 +8,20 @@ from head.fpn import FPNHead
 from backbone.res2net import res2net50_26w_4s, res2net50
 
 
+class DilationConvModule(nn.Module):
+    def __init__(self, c1, c2, k, s=1, p=0, d=1, g=1):
+        super().__init__()
+        self.conv = nn.Conv2d(c1, c2, k, s, p, d, g, bias=False)
+        self.bn = nn.BatchNorm2d(c2)
+        self.act = nn.ReLU(True)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.act(x)
+        return x
+
+
 class ConvModule(nn.Module):
     def __init__(self, c1, c2, k=1):
         super().__init__()
@@ -67,16 +81,44 @@ class FusionConnection(nn.Module):
         self.att_1 = ConvolutionalAttention(c1)
         # self.att_2 = MiT(c1, c2)
 
-        self.conv = ConvModule(2 * c2, c2)
+        d = (1, 2, 3)
+        self.d_1 = DilationConvModule(
+            c1,
+            c2,
+            (3, 3),
+            1,
+            p=(1 * d[0] + 1, 1 * d[0] + 1),
+            d=(d[0] + 1, d[0] + 1),
+        )
+        self.d_2 = DilationConvModule(
+            c1,
+            c2,
+            (3, 3),
+            1,
+            p=(1 * d[1] + 1, 1 * d[1] + 1),
+            d=(d[1] + 1, d[1] + 1),
+        )
+        self.d_3 = DilationConvModule(
+            c1,
+            c2,
+            (3, 3),
+            1,
+            p=(1 * d[2] + 1, 1 * d[2] + 1),
+            d=(d[2] + 1, d[2] + 1),
+        )
+
+        self.conv = ConvModule(len(d) * c2, c2)
 
     def forward(self, x1, x2):
         x1 = self.cbam_1(x1)
         x2 = self.cbam_2(x2)
 
+
+
         out = x1 + x2
-        
+
         att = self.att_1(out)
-        
+
         out = att + out
         # out = self.mit(x)
         # print(out.shape, x1.shape, x2.shape)
