@@ -113,13 +113,28 @@ class FusionConnection(nn.Module):
         x1 = self.cbam_1(x1)
         x2 = self.cbam_2(x2)
 
+        x1_d_1 = self.d_1(x1)
+        x1_d_2 = self.d_2(x1)
+        x1_d_3 = self.d_3(x1)
 
+        x2_d_1 = self.d_1(x2)
+        x2_d_2 = self.d_2(x2)
+        x2_d_3 = self.d_3(x2)
 
-        out = x1 + x2
+        xd_1 = x1_d_1 + x2_d_1
+        xd_3 = x1_d_2 + x2_d_2
+        xd_5 = x1_d_3 + x2_d_3
 
-        att = self.att_1(out)
+        out = torch.cat([x1, x2, xd_1, xd_3, xd_5], dim=1)
+        out = self.conv(out)
 
-        out = att + out
+        # added = x1 + x2
+        
+        # out = added + out
+
+        # att = self.att_1(out)
+
+        # out = att + out
         # out = self.mit(x)
         # print(out.shape, x1.shape, x2.shape)
 
