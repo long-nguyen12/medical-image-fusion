@@ -18,7 +18,7 @@ model_urls = {
 
 
 class Bottle2neck(nn.Module):
-    expansion = 4
+    expansion = 1
 
     def __init__(
         self,

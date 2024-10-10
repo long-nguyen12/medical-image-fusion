@@ -107,7 +107,7 @@ class FusionConnection(nn.Module):
             d=(d[2] + 1, d[2] + 1),
         )
 
-        self.conv = ConvModule(len(d) * c2, c2)
+        self.conv = ConvModule(2 * c1 + len(d) * c1, c2)
 
     def forward(self, x1, x2):
         x1 = self.cbam_1(x1)
@@ -146,10 +146,10 @@ class Encoder(nn.Module):
         super().__init__()
 
         self.encoder = res2net50(pretrained=False)
-        self.skip_1 = FusionConnection(256, 256)
-        self.skip_2 = FusionConnection(512, 512)
-        self.skip_3 = FusionConnection(1024, 1024)
-        self.skip_4 = FusionConnection(2048, 2048)
+        self.skip_1 = FusionConnection(64, 64)
+        self.skip_2 = FusionConnection(128, 128)
+        self.skip_3 = FusionConnection(256, 256)
+        self.skip_4 = FusionConnection(512, 512)
 
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.convs = ConvModule(1, 3, 1)
@@ -176,7 +176,7 @@ class FusionModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.encoder = Encoder()
-        self.decoder = FPNHead([256, 512, 1024, 2048])
+        self.decoder = FPNHead([64, 128, 256, 512])
         self.embed_dim = 64
         self.dim = 32
 
