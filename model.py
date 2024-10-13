@@ -145,7 +145,7 @@ class Encoder(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-        self.encoder = res2net50(pretrained=False)
+        self.encoder = Residual_Convs(in_channels=1, channels=[64, 128, 256, 512])
         self.skip_1 = FusionConnection(64, 64)
         self.skip_2 = FusionConnection(128, 128)
         self.skip_3 = FusionConnection(256, 256)
