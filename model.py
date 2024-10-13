@@ -145,18 +145,19 @@ class Encoder(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-        self.encoder = Residual_Convs(in_channels=1, channels=[64, 128, 256, 512])
-        self.skip_1 = FusionConnection(64, 64)
-        self.skip_2 = FusionConnection(128, 128)
-        self.skip_3 = FusionConnection(256, 256)
-        self.skip_4 = FusionConnection(512, 512)
+        self.encoder = Residual_Convs(in_channels=3, channels=[32, 64, 128, 256])
+        self.skip_1 = FusionConnection(32, 32)
+        self.skip_2 = FusionConnection(64, 64)
+        self.skip_3 = FusionConnection(128, 128)
+        self.skip_4 = FusionConnection(256, 256)
 
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.convs = ConvModule(1, 3, 1)
 
     def forward(self, img_1, img_2):
-        img_1 = self.convs(img_1)
-        img_2 = self.convs(img_2)
+        img_1 = self.maxpool(self.convs(img_1))
+        img_2 = self.maxpool(self.convs(img_2))
+        
 
         features_1 = self.encoder(img_1)
         features_2 = self.encoder(img_2)
@@ -176,7 +177,7 @@ class FusionModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.encoder = Encoder()
-        self.decoder = FPNHead([64, 128, 256, 512])
+        self.decoder = FPNHead(self.encoder.encoder.channels)
         self.embed_dim = 64
         self.dim = 32
 

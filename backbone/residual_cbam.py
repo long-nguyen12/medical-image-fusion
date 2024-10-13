@@ -6,17 +6,18 @@ from torch.nn import functional as F
 class ResBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1):
         super(ResBlock, self).__init__()
+        mid_channels = out_channels
         self.conv1 = nn.Conv2d(
-            in_channels, out_channels, kernel_size=3, stride=stride, padding=1
+            in_channels, mid_channels, kernel_size=3, stride=stride, padding=1
         )
-        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.bn1 = nn.BatchNorm2d(mid_channels)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1)
         self.bn2 = nn.BatchNorm2d(out_channels)
         if stride != 1 or out_channels != in_channels:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride),
-                nn.BatchNorm2d(out_channels),
+                nn.Conv2d(in_channels, mid_channels, kernel_size=1, stride=stride),
+                nn.BatchNorm2d(mid_channels),
             )
         else:
             self.shortcut = None
@@ -31,7 +32,7 @@ class ResBlock(nn.Module):
 
         out = self.conv2(out)
         out = self.bn2(out)
-
+        
         out += residual
         out = self.relu(out)
         return out
@@ -41,6 +42,7 @@ class Residual_Convs(nn.Module):
     def __init__(self, in_channels=1, channels=[32, 64, 160, 256]):
         super(Residual_Convs, self).__init__()
 
+        self.channels = channels
         self.res_1 = ResBlock(in_channels, channels[0], stride=1)
         self.res_2 = ResBlock(channels[0], channels[1], stride=2)
         self.res_3 = ResBlock(channels[1], channels[2], stride=2)
