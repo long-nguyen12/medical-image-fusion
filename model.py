@@ -107,25 +107,25 @@ class FusionConnection(nn.Module):
             d=(d[2] + 1, d[2] + 1),
         )
 
-        self.conv = ConvModule(2 * c1 + len(d) * c1, c2)
+        self.conv = ConvModule(len(d) * c1, c2)
 
     def forward(self, x1, x2):
         x1 = self.cbam_1(x1)
         x2 = self.cbam_2(x2)
 
         x1_d_1 = self.d_1(x1)
-        x1_d_2 = self.d_2(x1)
-        x1_d_3 = self.d_3(x1)
+        x1_d_2 = self.d_2(x1 * x1_d_1)
+        x1_d_3 = self.d_3(x1 * x1_d_2)
 
         x2_d_1 = self.d_1(x2)
-        x2_d_2 = self.d_2(x2)
-        x2_d_3 = self.d_3(x2)
+        x2_d_2 = self.d_2(x2 * x2_d_1)
+        x2_d_3 = self.d_3(x2 * x2_d_2)
 
         xd_1 = x1_d_1 + x2_d_1
         xd_3 = x1_d_2 + x2_d_2
         xd_5 = x1_d_3 + x2_d_3
 
-        out = torch.cat([x1, x2, xd_1, xd_3, xd_5], dim=1)
+        out = torch.cat([xd_1, xd_3, xd_5], dim=1)
         out = self.conv(out)
 
         # added = x1 + x2
