@@ -170,7 +170,14 @@ if __name__ == "__main__":
 
         # ---- flops and params ----
         params = model.parameters()
+        total_step = len(train_loader)
+
         optimizer = torch.optim.Adam(params, args.init_lr, betas=(0.9, 0.999), eps=1e-8)
+        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=len(train_loader) * args.epochs,
+            eta_min=args.lr / 1000,
+        )
         start_epoch = 1
         best_ssim = 0
 
@@ -192,6 +199,12 @@ if __name__ == "__main__":
             model.train()
             with torch.autograd.set_detect_anomaly(True):
                 for i, pack in enumerate(train_loader, start=1):
+                    if epoch <= 1:
+                        optimizer.param_groups[0]["lr"] = (
+                            (epoch * i) / (1.0 * total_step) * args.init_lr
+                        )
+                    else:
+                        lr_scheduler.step()
 
                     optimizer.zero_grad()
                     # ---- data prepare ----
@@ -233,14 +246,6 @@ if __name__ == "__main__":
                         loss_3_record.show(),
                     )
                 )
-
-            # torch.cuda.empty_cache()
-            # res = eval(model, test_loader, device)
-            # if res > best_ssim:
-            #     best_ssim = res
-            #     ckpt_path = save_path + "best.pth"
-            #     print("[Saving Checkpoint:]", ckpt_path)
-            #     torch.save(model.state_dict(), ckpt_path)
 
         ckpt_path = save_path + "last.pth"
         print("[Saving Checkpoint:]", ckpt_path)
