@@ -33,43 +33,57 @@ class ConvModule(nn.Module):
         return self.activate(self.bn(self.conv(x)))
 
 
-class ConvolutionalAttention(nn.Module):
+class BNPReLU(nn.Module):
+    def __init__(self, nIn):
+        super().__init__()
+        self.bn = nn.BatchNorm2d(nIn, eps=1e-3)
+        self.acti = nn.PReLU(nIn)
 
-    def __init__(self, dim):
-        super(ConvolutionalAttention, self).__init__()
-        # input
-        self.conv55 = nn.Conv2d(dim, dim, 5, padding=2, groups=dim)
+    def forward(self, input):
+        output = self.bn(input)
+        output = self.acti(output)
 
-        self.conv17_0 = nn.Conv2d(dim, dim, (1, 7), padding=(0, 3), groups=dim)
-        self.conv17_1 = nn.Conv2d(dim, dim, (7, 1), padding=(3, 0), groups=dim)
+        return output
 
-        self.conv111_0 = nn.Conv2d(dim, dim, (1, 11), padding=(0, 5), groups=dim)
-        self.conv111_1 = nn.Conv2d(dim, dim, (11, 1), padding=(5, 0), groups=dim)
 
-        self.conv211_0 = nn.Conv2d(dim, dim, (1, 21), padding=(0, 10), groups=dim)
-        self.conv211_1 = nn.Conv2d(dim, dim, (21, 1), padding=(10, 0), groups=dim)
+class Conv(nn.Module):
+    def __init__(
+        self,
+        nIn,
+        nOut,
+        kSize,
+        stride,
+        padding,
+        dilation=(1, 1),
+        groups=1,
+        bn_acti=False,
+        bias=False,
+    ):
+        super().__init__()
 
-        self.conv11 = nn.Conv2d(dim, dim, 1)  # channel mixer
+        self.bn_acti = bn_acti
 
-    def forward(self, x):
+        self.conv = nn.Conv2d(
+            nIn,
+            nOut,
+            kernel_size=kSize,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            groups=groups,
+            bias=bias,
+        )
 
-        skip = x.clone()
+        if self.bn_acti:
+            self.bn_relu = BNPReLU(nOut)
 
-        c55 = self.conv55(x)
-        c17 = self.conv17_0(x)
-        c17 = self.conv17_1(c17)
-        c111 = self.conv111_0(x)
-        c111 = self.conv111_1(c111)
-        c211 = self.conv211_0(x)
-        c211 = self.conv211_1(c211)
+    def forward(self, input):
+        output = self.conv(input)
 
-        add = c55 + c17 + c111 + c211
+        if self.bn_acti:
+            output = self.bn_relu(output)
 
-        mixer = self.conv11(add)
-
-        op = mixer * skip
-
-        return op
+        return output
 
 
 class FusionConnection(nn.Module):
@@ -78,7 +92,7 @@ class FusionConnection(nn.Module):
 
         self.cbam_1 = CBAM(c1)
         self.cbam_2 = CBAM(c1)
-        self.att_1 = ConvolutionalAttention(c1)
+
         # self.att_2 = MiT(c1, c2)
 
         d = (1, 2, 3)
@@ -106,6 +120,8 @@ class FusionConnection(nn.Module):
             p=(1 * d[2] + 1, 1 * d[2] + 1),
             d=(d[2] + 1, d[2] + 1),
         )
+        self.conv_1 = Conv(2 * c2, c2, 3, 1, 1)
+        self.conv_2 = Conv(2 * c2, c2, 5, 1, 2)
 
         self.conv = ConvModule(len(d) * c1, c2)
 
@@ -113,23 +129,35 @@ class FusionConnection(nn.Module):
         x1 = self.cbam_1(x1)
         x2 = self.cbam_2(x2)
 
-        x1_d_1 = self.d_1(x1)
-        x1_d_2 = self.d_2(x1 * x1_d_1)
-        x1_d_3 = self.d_3(x1 * x1_d_2)
+        x_cat = torch.cat([x1, x2], dim=1)
 
-        x2_d_1 = self.d_1(x2)
-        x2_d_2 = self.d_2(x2 * x2_d_1)
-        x2_d_3 = self.d_3(x2 * x2_d_2)
+        x_3 = self.conv_1(x_cat)
+        x_5 = self.conv_2(x_cat)
 
-        xd_1 = x1_d_1 + x2_d_1
-        xd_3 = x1_d_2 + x2_d_2
-        xd_5 = x1_d_3 + x2_d_3
+        atten_1 = x1 * x_3
+        atten_2 = x2 * x_5
 
-        out = torch.cat([xd_1, xd_3, xd_5], dim=1)
-        out = self.conv(out)
+        atten = atten_1 + atten_2
+
+        return atten
+
+        # x1_d_1 = self.d_1(x1)
+        # x1_d_2 = self.d_2(x1 * x1_d_1)
+        # x1_d_3 = self.d_3(x1 * x1_d_2)
+
+        # x2_d_1 = self.d_1(x2)
+        # x2_d_2 = self.d_2(x2 * x2_d_1)
+        # x2_d_3 = self.d_3(x2 * x2_d_2)
+
+        # xd_1 = x1_d_1 + x2_d_1
+        # xd_3 = x1_d_2 + x2_d_2
+        # xd_5 = x1_d_3 + x2_d_3
+
+        # out = torch.cat([xd_1, xd_3, xd_5], dim=1)
+        # out = self.conv(out)
 
         # added = x1 + x2
-        
+
         # out = added + out
 
         # att = self.att_1(out)
@@ -157,7 +185,6 @@ class Encoder(nn.Module):
     def forward(self, img_1, img_2):
         img_1 = self.maxpool(self.convs(img_1))
         img_2 = self.maxpool(self.convs(img_2))
-        
 
         features_1 = self.encoder(img_1)
         features_2 = self.encoder(img_2)
