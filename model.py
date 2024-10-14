@@ -173,7 +173,7 @@ class Encoder(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-        self.encoder = Residual_Convs(in_channels=3, channels=[32, 64, 128, 256])
+        self.encoder = Residual_Convs(in_channels=1, channels=[32, 64, 128, 256])
         self.skip_1 = FusionConnection(32, 32)
         self.skip_2 = FusionConnection(64, 64)
         self.skip_3 = FusionConnection(128, 128)
@@ -183,8 +183,8 @@ class Encoder(nn.Module):
         self.convs = ConvModule(1, 3, 1)
 
     def forward(self, img_1, img_2):
-        img_1 = self.maxpool(self.convs(img_1))
-        img_2 = self.maxpool(self.convs(img_2))
+        # img_1 = self.maxpool(self.convs(img_1))
+        # img_2 = self.maxpool(self.convs(img_2))
 
         features_1 = self.encoder(img_1)
         features_2 = self.encoder(img_2)
