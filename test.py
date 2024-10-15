@@ -107,20 +107,13 @@ def get_scores(src_1, src_2, prs):
         ens.append(en_val)
 
     _ssims = sum(ssims) / len(ssims)
-    print("psnrs")
-    print(sum(psnrs) / len(psnrs))
-    print("ssims")
-    print(sum(ssims) / len(ssims))
-    print("nmis")
-    print(sum(nmis) / len(nmis))
-    print("mis")
-    print(sum(mis) / len(mis))
-    print("fsims")
-    print(sum(fsims) / len(fsims))
-    print("entropy")
-    print(sum(ens) / len(ens))
+    _psnrs = sum(psnrs) / len(psnrs)
+    _nmis = sum(nmis) / len(nmis)
+    _mis = sum(mis) / len(mis)
+    _fsims = sum(fsims) / len(fsims)
+    _entropy = sum(ens) / len(ens)
 
-    return _ssims
+    return _ssims, _psnrs, _nmis, _mis, _fsims, _entropy
 
 
 @torch.no_grad()
@@ -219,4 +212,17 @@ if __name__ == "__main__":
         model = FusionModel().to(device)
         state_dict = torch.load(saved_model, map_location="cpu")
         model.load_state_dict(state_dict, strict=True)
-        inference(model, test_loader)
+        _ssims, _psnrs, _nmis, _mis, _fsims, _entropy = inference(model, test_loader)
+        
+        print("psnrs")
+        print(_psnrs)
+        print("ssims")
+        print(_ssims)
+        print("nmis")
+        print(_nmis)
+        print("mis")
+        print(_mis)
+        print("fsims")
+        print(_fsims)
+        print("entropy")
+        print(_entropy)

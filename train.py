@@ -78,7 +78,7 @@ def eval(model, test_loader, device):
         src_2.append(img_2)
         src_3.append(img_3)
 
-    ssim = get_scores(src_1, src_2, prs)
+    ssim, _, _, _, _, _ = get_scores(src_1, src_2, prs)
     return ssim
 
 
