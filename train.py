@@ -10,7 +10,6 @@ import torch
 from utils import AvgMeter, clip_gradient
 from torchvision import transforms
 
-# from val import inference
 from model import FusionModel
 from losses import CharbonnierLoss_IR, CharbonnierLoss_VI, tv_vi, tv_ir, ssim_loss
 from test import get_scores
@@ -56,6 +55,7 @@ class Dataset(torch.utils.data.Dataset):
             return np.asarray(img1_Y), np.asarray(img2), np.asarray(img1_CrCb)
 
 
+@torch.no_grad()
 def eval(model, test_loader, device):
     model.eval()
 
@@ -247,6 +247,13 @@ if __name__ == "__main__":
                         loss_3_record.show(),
                     )
                 )
+
+            res = eval(model, test_loader, device)
+            if res > best_ssim:
+                best_ssim = res
+                ckpt_path = save_path + "best.pth"
+                print("[Saving Checkpoint:]", ckpt_path)
+                torch.save(model.state_dict(), ckpt_path)
 
         ckpt_path = save_path + "last.pth"
         print("[Saving Checkpoint:]", ckpt_path)

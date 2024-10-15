@@ -83,8 +83,8 @@ class FusionConnection(nn.Module):
 
     def forward(self, x1, x2, enh=None):
         if enh is not None:
-            x1 = x1 + enh
-            x2 = x2 + enh
+            x1 = x1 * enh
+            x2 = x2 * enh
 
         x1 = self.cbam_1(x1)
         x2 = self.cbam_2(x2)
