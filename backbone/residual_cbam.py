@@ -1,7 +1,7 @@
 import torch
 from torch import nn, Tensor
 from torch.nn import functional as F
-
+from modules.modules import CBAM
 
 class ResBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1):
@@ -21,6 +21,7 @@ class ResBlock(nn.Module):
             )
         else:
             self.shortcut = None
+        self.att = CBAM(out_channels)
 
     def forward(self, x):
         residual = x
@@ -32,9 +33,10 @@ class ResBlock(nn.Module):
 
         out = self.conv2(out)
         out = self.bn2(out)
-        
+        out = self.att(out)
         out += residual
         out = self.relu(out)
+        
         return out
 
 
