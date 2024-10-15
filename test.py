@@ -123,6 +123,45 @@ def get_scores(src_1, src_2, prs):
     return _ssims
 
 
+@torch.no_grad()
+def inference(model, test_loader):
+    torch.cuda.empty_cache()
+    model.eval()
+
+    src_1 = []
+    src_2 = []
+    src_3 = []
+    prs = []
+    for i, pack in enumerate(test_loader, start=1):
+        img_1, img_2, img_3, img_name = pack
+        img_1 = img_1.to(device)
+        img_2 = img_2.to(device)
+
+        res = model(img_1, img_2)
+        prs.append(res)
+
+        res = res.data.cpu().numpy().squeeze()
+        res = (res - res.min()) / (res.max() - res.min() + 1e-8) * 255
+        fused_img = res
+
+        src_1.append(img_1)
+        src_2.append(img_2)
+        src_3.append(img_3)
+        # prs.append(res.astype(np.uint8))
+
+        # res = res.data.cpu().numpy()
+        # res = (res - res.min()) / (res.max() - res.min() + 1e-8) * 255
+        # img = res
+        # fused_img = np.concatenate((img, img_3), axis=1).squeeze()
+        # fused_img = np.transpose(fused_img, (1, 2, 0))
+        # fused_img = fused_img.astype(np.uint8)
+        # fused_img = cv2.cvtColor(fused_img, cv2.COLOR_YCrCb2BGR)
+        # print(f"{save_path}/{img_name[0]}")
+        cv2.imwrite(f"{save_path}/{img_name[0]}", fused_img)
+
+    get_scores(src_1, src_2, prs)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -180,39 +219,4 @@ if __name__ == "__main__":
         model = FusionModel().to(device)
         state_dict = torch.load(saved_model, map_location="cpu")
         model.load_state_dict(state_dict, strict=True)
-        model.eval()
-
-        torch.cuda.empty_cache()
-
-        src_1 = []
-        src_2 = []
-        src_3 = []
-        prs = []
-        for i, pack in enumerate(test_loader, start=1):
-            img_1, img_2, img_3, img_name = pack
-            img_1 = img_1.to(device)
-            img_2 = img_2.to(device)
-
-            res = model(img_1, img_2)
-            prs.append(res)
-
-            res = res.data.cpu().numpy().squeeze()
-            res = (res - res.min()) / (res.max() - res.min() + 1e-8) * 255
-            fused_img = res
-
-            src_1.append(img_1)
-            src_2.append(img_2)
-            src_3.append(img_3)
-            # prs.append(res.astype(np.uint8))
-
-            # res = res.data.cpu().numpy()
-            # res = (res - res.min()) / (res.max() - res.min() + 1e-8) * 255
-            # img = res
-            # fused_img = np.concatenate((img, img_3), axis=1).squeeze()
-            # fused_img = np.transpose(fused_img, (1, 2, 0))
-            # fused_img = fused_img.astype(np.uint8)
-            # fused_img = cv2.cvtColor(fused_img, cv2.COLOR_YCrCb2BGR)
-            # print(f"{save_path}/{img_name[0]}")
-            cv2.imwrite(f"{save_path}/{img_name[0]}", fused_img)
-
-        get_scores(src_1, src_2, prs)
+        inference(model, test_loader)
