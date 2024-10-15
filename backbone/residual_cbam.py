@@ -21,7 +21,7 @@ class ResBlock(nn.Module):
             )
         else:
             self.shortcut = None
-        self.att = CBAM(out_channels)
+        # self.att = CBAM(out_channels)
 
     def forward(self, x):
         residual = x
@@ -33,7 +33,7 @@ class ResBlock(nn.Module):
 
         out = self.conv2(out)
         out = self.bn2(out)
-        out = self.att(out)
+        # out = self.att(out)
         out += residual
         out = self.relu(out)
         

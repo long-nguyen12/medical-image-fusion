@@ -151,8 +151,22 @@ def inference(model, test_loader):
         # fused_img = cv2.cvtColor(fused_img, cv2.COLOR_YCrCb2BGR)
         # print(f"{save_path}/{img_name[0]}")
         cv2.imwrite(f"{save_path}/{img_name[0]}", fused_img)
+    
+    _ssims, _psnrs, _nmis, _mis, _fsims, _entropy = get_scores(src_1, src_2, prs)
+    
+    print("psnrs")
+    print(_psnrs)
+    print("ssims")
+    print(_ssims)
+    print("nmis")
+    print(_nmis)
+    print("mis")
+    print(_mis)
+    print("fsims")
+    print(_fsims)
+    print("entropy")
+    print(_entropy)
 
-    get_scores(src_1, src_2, prs)
 
 
 if __name__ == "__main__":
@@ -169,7 +183,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_save", type=str, default="ours")
     args = parser.parse_args()
 
-    device = torch.device("cuda")
+    device = torch.device("cuda:1")
 
     ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
     for _ds in ds:
@@ -208,21 +222,8 @@ if __name__ == "__main__":
             dataset, batch_size=1, shuffle=False, pin_memory=True, drop_last=True
         )
 
-        saved_model = f"snapshots/ours/{_ds}/last.pth"
+        saved_model = f"snapshots/ours/{_ds}/best.pth"
         model = FusionModel().to(device)
         state_dict = torch.load(saved_model, map_location="cpu")
         model.load_state_dict(state_dict, strict=True)
-        _ssims, _psnrs, _nmis, _mis, _fsims, _entropy = inference(model, test_loader)
-        
-        print("psnrs")
-        print(_psnrs)
-        print("ssims")
-        print(_ssims)
-        print("nmis")
-        print(_nmis)
-        print("mis")
-        print(_mis)
-        print("fsims")
-        print(_fsims)
-        print("entropy")
-        print(_entropy)
+        inference(model, test_loader)

@@ -69,52 +69,48 @@ class FusionConnection(nn.Module):
     def __init__(self, c1, c2) -> None:
         super().__init__()
 
-        self.cbam_1 = CBAM(c1)
+        self.cbam = CBAM(c1)
         self.cbam_2 = CBAM(c1)
 
-        self.conv11 = nn.Conv2d(2 * c2, c2, 1, padding=0, groups=c2)
+        # self.conv11 = nn.Conv2d(2 * c2, c2, 1, padding=0, groups=c2)
 
-        self.conv1_1 = nn.Conv2d(c2, c2, (1, 3), padding=(0, 1), groups=c2)
-        self.conv1_2 = nn.Conv2d(c2, c2, (3, 1), padding=(1, 0), groups=c2)
+        # self.conv1_1 = nn.Conv2d(c2, c2, (1, 3), padding=(0, 1), groups=c2)
+        # self.conv1_2 = nn.Conv2d(c2, c2, (3, 1), padding=(1, 0), groups=c2)
 
-        self.conv2_1 = nn.Conv2d(c2, c2, (1, 5), padding=(0, 2), groups=c2)
-        self.conv2_2 = nn.Conv2d(c2, c2, (5, 1), padding=(2, 0), groups=c2)
+        # self.conv2_1 = nn.Conv2d(c2, c2, (1, 5), padding=(0, 2), groups=c2)
+        # self.conv2_2 = nn.Conv2d(c2, c2, (5, 1), padding=(2, 0), groups=c2)
 
-        self.conv3 = nn.Conv2d(c2, c2, 1)
+        # self.conv3 = nn.Conv2d(c2, c2, 1)
 
-        self.se = SELayer(c2)
+        # self.se = SELayer(c2)
 
-        # self.conv_1 = Conv(2 * c2, c2, 3, 1, 1)
-        # self.conv_2 = Conv(2 * c2, c2, 5, 1, 2)
+        self.conv_1 = Conv(2 * c2, c2, 3, 1, 1)
+        self.conv_2 = Conv(2 * c2, c2, 5, 1, 2)
 
     def forward(self, x1, x2):
-        x1 = self.se(x1)
-        x2 = self.se(x2)
+        x1 = self.cbam(x1)
+        x2 = self.cbam(x2)
 
         x_cat = torch.cat([x1, x2], dim=1)
 
-        # x_3 = self.conv_1(x_cat)
-        # x_5 = self.conv_2(x_cat)
+        # x_1 = self.conv11(x_cat)
 
-        x_1 = self.conv11(x_cat)
+        # x_3 = self.conv1_1(x_1)
+        # x_3 = self.conv1_2(x_3)
 
-        x_3 = self.conv1_1(x_1)
-        x_3 = self.conv1_2(x_3)
+        # x_5 = self.conv2_1(x_1)
+        # x_5 = self.conv2_2(x_5)
 
-        x_5 = self.conv2_1(x_1)
-        x_5 = self.conv2_2(x_5)
-
-        x_sum = x_1 + x_3 + x_5
+        # x_sum = x_1 + x_3 + x_5
+        # x_sum = self.conv3(x_sum)
+        # atten = x_sum * x1 * x2
         
-        x_sum = self.conv3(x_sum)
-        
+        x_3 = self.conv_1(x_cat)
+        x_5 = self.conv_2(x_cat)
+        atten_1 = x1 * x_3
+        atten_2 = x2 * x_5
 
-        # atten_1 = x1 * x_3
-        # atten_2 = x2 * x_5
-
-        # atten = atten_1 + atten_2 + x1 + x2
-        
-        atten = x_sum * x1 * x2
+        atten = atten_1 + atten_2 + x1 + x2
 
         return atten
 
@@ -153,8 +149,6 @@ class FusionModel(nn.Module):
         super().__init__()
         self.encoder = Encoder()
         self.decoder = FPNHead(self.encoder.encoder.channels)
-        self.embed_dim = 64
-        self.dim = 32
 
         self.sigmoid = nn.Sigmoid()
 
@@ -162,7 +156,7 @@ class FusionModel(nn.Module):
         features = self.encoder(x, y)
         out = self.decoder(features)
         out = self.sigmoid(out)
-        out = F.interpolate(out, size=x.size()[2:], mode="bicubic", align_corners=True)
+        out = F.interpolate(out, size=x.size()[2:], mode="bilinear", align_corners=True)
 
         return out
 
