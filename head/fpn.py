@@ -20,7 +20,7 @@ class FPNHead(nn.Module):
 
         for ch in in_channels[::-1]:
             self.lateral_convs.append(ConvModule(ch, channel, 1))
-            self.output_convs.append(ConvModule(channel, channel, 3, 1, 1))
+            self.output_convs.append(ConvModule(channel * 2, channel, 3, 1, 1))
 
         self.conv_seg = nn.Conv2d(channel, num_classes, 1)
         self.dropout = nn.Dropout2d(0.1)
@@ -31,7 +31,8 @@ class FPNHead(nn.Module):
 
         for i in range(1, len(features)):
             out = F.interpolate(out, scale_factor=2.0, mode="nearest")
-            out = out + self.lateral_convs[i](features[i])
+            lat = self.lateral_convs[i](features[i])
+            out = torch.cat([out, lat], dim = 1)
             out = self.output_convs[i](out)
         out = self.conv_seg(self.dropout(out))
         return out

@@ -107,7 +107,8 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     epochs = args.num_epochs
-    ds = ["PET-MRI", "SPECT-MRI"]
+    ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
+    # ds = ["CT-MRI"]
     for _ds in ds:
         save_path = "snapshots/{}/{}/".format(args.train_save, _ds)
         if not os.path.exists(save_path):
@@ -175,8 +176,8 @@ if __name__ == "__main__":
         optimizer = torch.optim.Adam(params, args.init_lr, betas=(0.9, 0.999), eps=1e-8)
         lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer,
-            T_max=len(train_loader) * args.epochs,
-            eta_min=args.lr / 1000,
+            T_max=len(train_loader) * epochs,
+            eta_min=args.init_lr / 1000,
         )
         start_epoch = 1
         best_ssim = 0

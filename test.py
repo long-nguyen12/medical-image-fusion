@@ -129,9 +129,6 @@ if __name__ == "__main__":
         "--init_trainsize", type=int, default=256, help="training dataset size"
     )
     parser.add_argument(
-        "--clip", type=float, default=0.5, help="gradient clipping margin"
-    )
-    parser.add_argument(
         "--test_path",
         type=str,
         default="./data/Havard-Medical-Image-Fusion-Datasets/MyDatasets",
@@ -140,9 +137,9 @@ if __name__ == "__main__":
     parser.add_argument("--train_save", type=str, default="ours")
     args = parser.parse_args()
 
-    device = torch.device("cuda")
+    device = torch.device("cuda:1")
 
-    ds = ["PET-MRI", "SPECT-MRI"]
+    ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
     for _ds in ds:
         save_path = "results/{}/".format(_ds)
         if not os.path.exists(save_path):
@@ -183,9 +180,9 @@ if __name__ == "__main__":
         model = FusionModel().to(device)
         state_dict = torch.load(saved_model, map_location="cpu")
         model.load_state_dict(state_dict, strict=True)
+        model.eval()
 
         torch.cuda.empty_cache()
-        model.eval()
 
         src_1 = []
         src_2 = []
