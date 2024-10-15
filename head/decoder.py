@@ -2,7 +2,6 @@ import torch
 from torch import nn, Tensor
 from torch.nn import functional as F
 from typing import Tuple
-from attention.modules import CBAM
 
 
 class ResBlock(nn.Module):

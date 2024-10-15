@@ -1,11 +1,10 @@
-from attention.modules import CBAM
+from modules.modules import CBAM, BasicConv
 from torch import nn
 import torch
 from torch.nn import functional as F
 from backbone.residual_cbam import Residual_Convs, ResBlock
-from attention.mit import MiT
 from head.fpn import FPNHead
-from backbone.res2net import res2net50_26w_4s, res2net50
+from modules.common import Conv, ConvModule
 
 
 class DilationConvModule(nn.Module):
@@ -22,68 +21,48 @@ class DilationConvModule(nn.Module):
         return x
 
 
-class ConvModule(nn.Module):
-    def __init__(self, c1, c2, k=1):
+# Dilation Attention Module
+class DAM(nn.Module):
+    def __init__(self, c1, c2, d=None, out_k=1) -> None:
         super().__init__()
-        self.conv = nn.Conv2d(c1, c2, k, bias=False)
-        self.bn = nn.BatchNorm2d(c2)  # use SyncBN in original
-        self.activate = nn.ReLU(True)
+        d = (1, 3, 5)
 
-    def forward(self, x):
-        return self.activate(self.bn(self.conv(x)))
+        self.conv11 = BasicConv(c1, c2, 1)
 
-
-class BNPReLU(nn.Module):
-    def __init__(self, nIn):
-        super().__init__()
-        self.bn = nn.BatchNorm2d(nIn, eps=1e-3)
-        self.acti = nn.PReLU(nIn)
-
-    def forward(self, input):
-        output = self.bn(input)
-        output = self.acti(output)
-
-        return output
-
-
-class Conv(nn.Module):
-    def __init__(
-        self,
-        nIn,
-        nOut,
-        kSize,
-        stride,
-        padding,
-        dilation=(1, 1),
-        groups=1,
-        bn_acti=False,
-        bias=False,
-    ):
-        super().__init__()
-
-        self.bn_acti = bn_acti
-
-        self.conv = nn.Conv2d(
-            nIn,
-            nOut,
-            kernel_size=kSize,
-            stride=stride,
-            padding=padding,
-            dilation=dilation,
-            groups=groups,
-            bias=bias,
+        self.d_1 = DilationConvModule(
+            c2,
+            c2,
+            (3, 3),
+            1,
+            p=(1 * d[0] + 1, 1 * d[0] + 1),
+            d=(d[0] + 1, d[0] + 1),
+        )
+        self.d_3 = DilationConvModule(
+            c2,
+            c2,
+            (3, 3),
+            1,
+            p=(1 * d[1] + 1, 1 * d[1] + 1),
+            d=(d[1] + 1, d[1] + 1),
+        )
+        self.d_5 = DilationConvModule(
+            c2,
+            c2,
+            (3, 3),
+            1,
+            p=(1 * d[2] + 1, 1 * d[2] + 1),
+            d=(d[2] + 1, d[2] + 1),
         )
 
-        if self.bn_acti:
-            self.bn_relu = BNPReLU(nOut)
+    def forward(self, x):
+        x = self.conv11(x)
+        x_1 = self.d_1(x)
+        x_3 = self.d_3(x)
+        x_5 = self.d_5(x)
+        x_atten = x_1 * x_3 * x_5
+        x_out = x + x_atten
 
-    def forward(self, input):
-        output = self.conv(input)
-
-        if self.bn_acti:
-            output = self.bn_relu(output)
-
-        return output
+        return x_out
 
 
 class FusionConnection(nn.Module):
@@ -93,60 +72,33 @@ class FusionConnection(nn.Module):
         self.cbam_1 = CBAM(c1)
         self.cbam_2 = CBAM(c1)
 
-        # self.att_2 = MiT(c1, c2)
+        # self.conv0_1 = nn.Conv2d(2 * c2, c2, (1, 3), padding=(0, 1), groups=c2)
+        # self.conv0_2 = nn.Conv2d(c2, c2, (3, 1), padding=(1, 0), groups=c2)
 
-        d = (1, 3, 5)
-        self.d_1 = DilationConvModule(
-            c1,
-            c2,
-            (3, 3),
-            1,
-            p=(1 * d[0] + 1, 1 * d[0] + 1),
-            d=(d[0] + 1, d[0] + 1),
-        )
-        self.d_2 = DilationConvModule(
-            c1,
-            c2,
-            (3, 3),
-            1,
-            p=(1 * d[1] + 1, 1 * d[1] + 1),
-            d=(d[1] + 1, d[1] + 1),
-        )
-        self.d_3 = DilationConvModule(
-            c1,
-            c2,
-            (3, 3),
-            1,
-            p=(1 * d[2] + 1, 1 * d[2] + 1),
-            d=(d[2] + 1, d[2] + 1),
-        )
-        
-        self.conv0_1 = nn.Conv2d(2 * c2, c2, (1, 3), padding=(0, 1), groups=c2)
-        self.conv0_2 = nn.Conv2d(c2, c2, (3, 1), padding=(1, 0), groups=c2)
-        
-        self.conv1_1 = nn.Conv2d(2 * c2, c2, (1, 5), padding=(0, 2), groups=c2)
-        self.conv1_2 = nn.Conv2d(c2, c2, (5, 1), padding=(2, 0), groups=c2)
-        
-        # self.conv2_1 = nn.Conv2d(2 * c2, c2, (1, 7), padding=(0, 3), groups=c2)
-        # self.conv2_2 = nn.Conv2d(c2, c2, (7, 1), padding=(3, 0), groups=c2)
+        # self.conv1_1 = nn.Conv2d(2 * c2, c2, (1, 5), padding=(0, 2), groups=c2)
+        # self.conv1_2 = nn.Conv2d(c2, c2, (5, 1), padding=(2, 0), groups=c2)
 
-        # self.conv_1 = Conv(2 * c2, c2, 3, 1, 1)
-        # self.conv_2 = Conv(2 * c2, c2, 5, 1, 2)
+        self.conv_1 = Conv(2 * c2, c2, 3, 1, 1)
+        self.conv_2 = Conv(2 * c2, c2, 5, 1, 2)
 
-    def forward(self, x1, x2):
+    def forward(self, x1, x2, enh=None):
+        if enh is not None:
+            x1 = x1 + enh
+            x2 = x2 + enh
+
         x1 = self.cbam_1(x1)
         x2 = self.cbam_2(x2)
 
         x_cat = torch.cat([x1, x2], dim=1)
-        
-        # x_3 = self.conv_1(x_cat)
-        # x_5 = self.conv_2(x_cat)
-        
-        x_3 = self.conv0_1(x_cat)
-        x_3 = self.conv0_2(x_3)
-        
-        x_5 = self.conv1_1(x_cat)
-        x_5 = self.conv1_2(x_5)
+
+        x_3 = self.conv_1(x_cat)
+        x_5 = self.conv_2(x_cat)
+
+        # x_3 = self.conv0_1(x_cat)
+        # x_3 = self.conv0_2(x_3)
+
+        # x_5 = self.conv1_1(x_cat)
+        # x_5 = self.conv1_2(x_5)
 
         atten_1 = x1 * x_3
         atten_2 = x2 * x_5
@@ -161,17 +113,23 @@ class Encoder(nn.Module):
         super().__init__()
 
         self.encoder = Residual_Convs(in_channels=1, channels=[32, 64, 128, 256])
+
+        self.dam_1 = DAM(2, 32)
+        self.dam_2 = DAM(32, 64)
+        self.dam_3 = DAM(64, 128)
+        self.dam_4 = DAM(128, 256)
+
         self.skip_1 = FusionConnection(32, 32)
         self.skip_2 = FusionConnection(64, 64)
         self.skip_3 = FusionConnection(128, 128)
         self.skip_4 = FusionConnection(256, 256)
 
+        self.convs = ConvModule(2, 3, 1)        
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.convs = ConvModule(1, 3, 1)
+
 
     def forward(self, img_1, img_2):
-        # img_1 = self.maxpool(self.convs(img_1))
-        # img_2 = self.maxpool(self.convs(img_2))
+        enh_1 = self.dam_1(torch.cat([img_1, img_2], dim=1))
 
         features_1 = self.encoder(img_1)
         features_2 = self.encoder(img_2)
@@ -179,12 +137,15 @@ class Encoder(nn.Module):
         x1, x2, x3, x4 = features_1
         y1, y2, y3, y4 = features_2
 
-        skip_mod_1 = self.skip_1(x1, y1)
-        skip_mod_2 = self.skip_2(x2, y2)
-        skip_mod_3 = self.skip_3(x3, y3)
-        skip_mod_4 = self.skip_4(x4, y4)
+        fm_1 = self.skip_1(x1, y1, enh_1)
+        enh_2 = self.maxpool(self.dam_2(fm_1))
+        fm_2 = self.skip_2(x2, y2, enh_2)
+        enh_3 = self.maxpool(self.dam_3(fm_2))
+        fm_3 = self.skip_3(x3, y3, enh_3)
+        enh_4 = self.maxpool(self.dam_4(fm_3))
+        fm_4 = self.skip_4(x4, y4, enh_4)
 
-        return skip_mod_1, skip_mod_2, skip_mod_3, skip_mod_4
+        return fm_1, fm_2, fm_3, fm_4
 
 
 class FusionModel(nn.Module):
