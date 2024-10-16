@@ -222,7 +222,7 @@ if __name__ == "__main__":
             dataset, batch_size=1, shuffle=False, pin_memory=True, drop_last=True
         )
 
-        saved_model = f"snapshots/ours/{_ds}/best.pth"
+        saved_model = f"snapshots/ours/{_ds}/last.pth"
         model = FusionModel().to(device)
         state_dict = torch.load(saved_model, map_location="cpu")
         model.load_state_dict(state_dict, strict=True)

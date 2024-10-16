@@ -85,7 +85,7 @@ def eval(model, test_loader, device):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--num_epochs", type=int, default=100, help="epoch number")
-    parser.add_argument("--init_lr", type=float, default=1e-4, help="learning rate")
+    parser.add_argument("--init_lr", type=float, default=1e-3, help="learning rate")
     parser.add_argument("--batchsize", type=int, default=4, help="training batch size")
     parser.add_argument(
         "--init_trainsize", type=int, default=256, help="training dataset size"
@@ -100,7 +100,6 @@ if __name__ == "__main__":
         help="path to train dataset",
     )
     parser.add_argument("--train_save", type=str, default="ours")
-    parser.add_argument("--weight", default=[1, 1, 1, 1], type=float)
 
     args = parser.parse_args()
 
@@ -188,7 +187,6 @@ if __name__ == "__main__":
         loss_3_record = AvgMeter()
         loss_4_record = AvgMeter()
 
-        weight = args.weight
         criterion_CharbonnierLoss_IR = CharbonnierLoss_IR
         criterion_CharbonnierLoss_VI = CharbonnierLoss_VI
         criterion_tv_ir = tv_ir
@@ -248,12 +246,12 @@ if __name__ == "__main__":
                     )
                 )
 
-            res = eval(model, test_loader, device)
-            if res > best_ssim:
-                best_ssim = res
-                ckpt_path = save_path + "best.pth"
-                print("[Saving Checkpoint:]", ckpt_path)
-                torch.save(model.state_dict(), ckpt_path)
+            # res = eval(model, test_loader, device)
+            # if res > best_ssim:
+            #     best_ssim = res
+            #     ckpt_path = save_path + "best.pth"
+            #     print("[Saving Checkpoint:]", ckpt_path)
+            #     torch.save(model.state_dict(), ckpt_path)
 
         ckpt_path = save_path + "last.pth"
         print("[Saving Checkpoint:]", ckpt_path)
