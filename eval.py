@@ -12,6 +12,9 @@ import sklearn.metrics as skm
 import torch
 from skimage.metrics import peak_signal_noise_ratio, normalized_mutual_information
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
+import sklearn.metrics as skm
+from scipy.signal import convolve2d
+import math
 #from TMQI import TMQI, TMQIr
 
 def psnr(img_pred: torch.Tensor, img_true: torch.Tensor):
@@ -81,4 +84,48 @@ def mi2(x, y):
     x = np.reshape(x, -1)
     y = np.reshape(y, -1)
     return skm.mutual_info_score(x, y)
+
+def Qabf(image_F, image_A, image_B):
+    gA, aA = Qabf_getArray(image_A)
+    gB, aB = Qabf_getArray(image_B)
+    gF, aF = Qabf_getArray(image_F)
+    QAF = Qabf_getQabf(aA, gA, aF, gF)
+    QBF = Qabf_getQabf(aB, gB, aF, gF)
+
+    # 计算QABF
+    deno = np.sum(gA + gB)
+    nume = np.sum(np.multiply(QAF, gA) + np.multiply(QBF, gB))
+    return nume / deno
+
+def Qabf_getArray(img):
+    # Sobel Operator Sobel算子
+    h1 = np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]]).astype(np.float32)
+    h2 = np.array([[0, 1, 2], [-1, 0, 1], [-2, -1, 0]]).astype(np.float32)
+    h3 = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]).astype(np.float32)
+
+    SAx = convolve2d(img, h3, mode='same')
+    SAy = convolve2d(img, h1, mode='same')
+    gA = np.sqrt(np.multiply(SAx, SAx) + np.multiply(SAy, SAy))
+    aA = np.zeros_like(img)
+    aA[SAx == 0] = math.pi / 2
+    aA[SAx != 0]=np.arctan(SAy[SAx != 0] / SAx[SAx != 0])
+    return gA, aA
+
+def Qabf_getQabf(aA, gA, aF, gF):
+    L = 1
+    Tg = 0.9994
+    kg = -15
+    Dg = 0.5
+    Ta = 0.9879
+    ka = -22
+    Da = 0.8
+    GAF,AAF,QgAF,QaAF,QAF = np.zeros_like(aA),np.zeros_like(aA),np.zeros_like(aA),np.zeros_like(aA),np.zeros_like(aA)
+    GAF[gA>gF]=gF[gA>gF]/gA[gA>gF]
+    GAF[gA == gF] = gF[gA == gF]
+    GAF[gA <gF] = gA[gA<gF]/gF[gA<gF]
+    AAF = 1 - np.abs(aA - aF) / (math.pi / 2)
+    QgAF = Tg / (1 + np.exp(kg * (GAF - Dg)))
+    QaAF = Ta / (1 + np.exp(ka * (AAF - Da)))
+    QAF = QgAF* QaAF
+    return QAF
 

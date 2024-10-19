@@ -10,7 +10,7 @@ from torchvision import transforms
 
 from model import FusionModel
 from torchvision.utils import save_image
-from eval import psnr, ssim, mutual_information
+from eval import psnr, ssim, mutual_information, Qabf
 from evaluation_metrics import fsim, nmi, en
 
 
@@ -72,6 +72,7 @@ def get_scores(src_1, src_2, prs):
     mis = []
     fsims = []
     ens = []
+    qabf = []
 
     for gt1, gt2, pr in zip(src_1, src_2, prs):
         gt1 = gt1.squeeze(0).squeeze(0).cpu().clamp(min=0, max=1)
@@ -105,6 +106,9 @@ def get_scores(src_1, src_2, prs):
 
         en_val = en(pr)
         ens.append(en_val)
+        
+        abf = Qabf(pr, gt1, gt2)
+        qabf.append(abf)
 
     _ssims = sum(ssims) / len(ssims)
     _psnrs = sum(psnrs) / len(psnrs)
@@ -112,8 +116,9 @@ def get_scores(src_1, src_2, prs):
     _mis = sum(mis) / len(mis)
     _fsims = sum(fsims) / len(fsims)
     _entropy = sum(ens) / len(ens)
+    _qabf = sum(qabf) / len(qabf)
 
-    return _ssims, _psnrs, _nmis, _mis, _fsims, _entropy
+    return _ssims, _psnrs, _nmis, _mis, _fsims, _entropy, _qabf
 
 
 @torch.no_grad()
@@ -152,7 +157,7 @@ def inference(model, test_loader):
         # print(f"{save_path}/{img_name[0]}")
         cv2.imwrite(f"{save_path}/{img_name[0]}", fused_img)
     
-    _ssims, _psnrs, _nmis, _mis, _fsims, _entropy = get_scores(src_1, src_2, prs)
+    _ssims, _psnrs, _nmis, _mis, _fsims, _entropy, _qabf = get_scores(src_1, src_2, prs)
     
     print("psnrs")
     print(_psnrs)
@@ -166,6 +171,8 @@ def inference(model, test_loader):
     print(_fsims)
     print("entropy")
     print(_entropy)
+    print("Qabf")
+    print(_qabf)
 
 
 

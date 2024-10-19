@@ -20,7 +20,7 @@ class FPNHead(nn.Module):
 
         for ch in in_channels[::-1]:
             self.lateral_convs.append(ConvModule(ch, channel, 1))
-            self.output_convs.append(ConvModule(channel, channel, 3, 1, 1))
+            self.output_convs.append(ConvModule(channel, channel, 1, 1, 0))
 
         self.conv_seg = nn.Conv2d(channel, num_classes, 1)
         self.dropout = nn.Dropout2d(0.1)

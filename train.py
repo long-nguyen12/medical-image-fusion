@@ -55,37 +55,10 @@ class Dataset(torch.utils.data.Dataset):
             return np.asarray(img1_Y), np.asarray(img2), np.asarray(img1_CrCb)
 
 
-@torch.no_grad()
-def eval(model, test_loader, device):
-    model.eval()
-
-    src_1 = []
-    src_2 = []
-    src_3 = []
-    prs = []
-    for i, pack in enumerate(test_loader, start=1):
-        img_1, img_2, img_3 = pack
-        img_1 = img_1.to(device)
-        img_2 = img_2.to(device)
-
-        res = model(img_1, img_2)
-        prs.append(res)
-
-        res = res.data.cpu().numpy().squeeze()
-        res = (res - res.min()) / (res.max() - res.min() + 1e-8) * 255
-
-        src_1.append(img_1)
-        src_2.append(img_2)
-        src_3.append(img_3)
-
-    ssim, _, _, _, _, _ = get_scores(src_1, src_2, prs)
-    return ssim
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--num_epochs", type=int, default=100, help="epoch number")
-    parser.add_argument("--init_lr", type=float, default=1e-3, help="learning rate")
+    parser.add_argument("--init_lr", type=float, default=1e-4, help="learning rate")
     parser.add_argument("--batchsize", type=int, default=4, help="training batch size")
     parser.add_argument(
         "--init_trainsize", type=int, default=256, help="training dataset size"
@@ -107,7 +80,7 @@ if __name__ == "__main__":
 
     epochs = args.num_epochs
     ds = ["CT-MRI", "PET-MRI", "SPECT-MRI"]
-    # ds = ["CT-MRI"]
+
     for _ds in ds:
         save_path = "snapshots/{}/{}/".format(args.train_save, _ds)
         if not os.path.exists(save_path):
@@ -245,13 +218,6 @@ if __name__ == "__main__":
                         loss_3_record.show(),
                     )
                 )
-
-            # res = eval(model, test_loader, device)
-            # if res > best_ssim:
-            #     best_ssim = res
-            #     ckpt_path = save_path + "best.pth"
-            #     print("[Saving Checkpoint:]", ckpt_path)
-            #     torch.save(model.state_dict(), ckpt_path)
 
         ckpt_path = save_path + "last.pth"
         print("[Saving Checkpoint:]", ckpt_path)

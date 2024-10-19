@@ -53,14 +53,16 @@ class DAM(nn.Module):
             p=(1 * d[2] + 1, 1 * d[2] + 1),
             d=(d[2] + 1, d[2] + 1),
         )
+        
+        self.conv_out = nn.Conv2d(3 * c2, c2, 1, padding=0, groups=c2)
 
     def forward(self, x):
         x = self.conv11(x)
         x_1 = self.d_1(x)
         x_3 = self.d_3(x)
         x_5 = self.d_5(x)
-        x_atten = x_1 * x_3 * x_5
-        x_out = x + x_atten
+        x_atten = torch.cat([x_1, x_3, x_5], dim=1)
+        x_out = x + self.conv_out(x_atten)
 
         return x_out
 
@@ -82,8 +84,8 @@ class FusionConnection(nn.Module):
 
         # self.conv3 = nn.Conv2d(c2, c2, 1)
 
-        # self.se = SELayer(c2)
-
+        self.dam = DAM(2 * c2, c2)
+        
         self.conv_1 = Conv(2 * c2, c2, 3, 1, 1)
         self.conv_2 = Conv(2 * c2, c2, 5, 1, 2)
 
@@ -93,7 +95,7 @@ class FusionConnection(nn.Module):
 
         x_cat = torch.cat([x1, x2], dim=1)
 
-        # x_1 = self.conv11(x_cat)
+        # x_cat = self.conv11(x_cat)
 
         # x_3 = self.conv1_1(x_1)
         # x_3 = self.conv1_2(x_3)
@@ -105,12 +107,14 @@ class FusionConnection(nn.Module):
         # x_sum = self.conv3(x_sum)
         # atten = x_sum * x1 * x2
         
-        x_3 = self.conv_1(x_cat)
-        x_5 = self.conv_2(x_cat)
-        atten_1 = x1 * x_3
-        atten_2 = x2 * x_5
+        # x_3 = self.conv_1(x_cat)
+        # x_5 = self.conv_2(x_cat)
+        # atten_1 = x1 * x_3
+        # atten_2 = x2 * x_5
 
-        atten = atten_1 + atten_2 + x1 + x2
+        # atten = atten_1 + atten_2 + x1 + x2
+        atten = self.dam(x_cat) + x1 + x2
+        
 
         return atten
 

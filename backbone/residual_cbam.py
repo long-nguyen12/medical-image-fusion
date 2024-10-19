@@ -29,7 +29,7 @@ class ResBlock(nn.Module):
             residual = self.shortcut(x)
         out = self.conv1(x)
         out = self.bn1(out)
-        out += residual
+        # out += residual
 
         out = self.conv2(out)
         out = self.bn2(out)
